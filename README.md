@@ -65,18 +65,19 @@ natives' built `build/Release/*.node` stay resolvable through the submodule.
 
 ### Where development happens
 
-Active development of the app happens **in the SigmaLink monorepo** under
-[`sigma-voice/`](https://github.com/s1gmamale1/SigmaLink/tree/main/sigma-voice)
-(where the engine lives and builds in one tree). **This repo is the standalone
-release/distribution home**, mirrored from there. To pull in upstream changes:
+**App-shell development happens in THIS repo** (`src/`, `renderer/`, `scripts/`, configs). The
+voice **engine + native modules** are authored in SigmaLink and consumed here via the `./sigmalink/`
+submodule — fix engine/native code in SigmaLink, then bump the submodule pointer:
 
 ```bash
-# bump the engine + app to a newer SigmaLink commit
-git -C sigmalink fetch && git -C sigmalink checkout <sigmalink-sha>
-git add sigmalink                      # record the new submodule pointer
-# re-mirror the app files (src/, renderer/, scripts/, build/, configs) from
-# sigmalink/sigma-voice/ — keeping this repo's package.json link: paths
+git -C sigmalink fetch origin && git -C sigmalink checkout <sigmalink-sha>
+git add sigmalink && git commit -m "bump engine submodule → <sha>"
 ```
+
+> The two open bugs (Windows build, quit-time abort) are in the engine/natives → fixed in SigmaLink.
+> Full orientation for maintainers: **[`docs/HANDOFF.md`](docs/HANDOFF.md)**. Conventions:
+> **[`CLAUDE.md`](CLAUDE.md)**. (`SigmaLink/sigma-voice/` is the historical dev copy, pre-2026-05-29;
+> this repo is authoritative for the app shell now.)
 
 ## Develop / build
 
