@@ -1,6 +1,6 @@
 {
   "name": "@sigmalink/sigma-voice",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "SigmaVoice — standalone system-wide dictation app powered by @sigmalink/voice-core. Hotkey → capture → whisper transcribe → clipboard/AX-paste into any focused app.",
   "author": "SigmaLink Team",
@@ -20,7 +20,8 @@
     "@sigmalink/voice-win": "link:sigmalink/app/native/voice-win",
     "@sigmalink/voice-whisper": "link:sigmalink/app/native/voice-whisper",
     "node-global-key-listener": "^0.3.0",
-    "node-gyp-build": "^4.8.1"
+    "node-gyp-build": "^4.8.1",
+    "sudo-prompt": "^9.2.1"
   },
   "peerDependencies": {
     "electron": "*"
