@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: '20.x'
 
-      - name: Install (link: engine from ./sigmalink; skip native postinstall)
+      - name: Install engine (link deps from ./sigmalink; skip native postinstall)
         run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Typecheck
