@@ -1,0 +1,11 @@
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# Build output
+sigma-dist/
+release/
+
+# Logs / OS cruft
+*.log
+.DS_Store

@@ -1,0 +1,43 @@
+name: ci
+
+# Build gate for the standalone SigmaVoice app. Validates that the app
+# typechecks and bundles against the SigmaLink voice engine pulled in via the
+# `sigmalink/` git submodule. Does NOT build native binaries or package an
+# installer (that is release.yml's job) — esbuild keeps the natives external, so
+# this gate runs without compiling whisper.cpp.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: typecheck + bundle
+    runs-on: macos-14
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (with SigmaLink submodule)
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
+      - name: Install (link: engine from ./sigmalink; skip native postinstall)
+        run: pnpm install --no-frozen-lockfile --ignore-scripts
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Bundle (esbuild — natives external)
+        run: pnpm build
