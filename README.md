@@ -19,6 +19,25 @@ local, private — no cloud, no account.
 - **Usage stats** — words, sessions, average WPM, recent activity.
 - Single-instance, tray-only, persistent settings.
 
+## Install (macOS · Apple Silicon)
+
+One-line install — `curl` doesn't set the Gatekeeper quarantine flag, so it just works (no "unidentified developer" dialog):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s1gmamale1/SigmaVoice/main/scripts/install-macos.sh | bash
+```
+
+Pin a version: append `-s v0.3.0`. Prefer to inspect first:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/s1gmamale1/SigmaVoice/main/scripts/install-macos.sh -o install-sigmavoice.sh
+less install-sigmavoice.sh && bash install-sigmavoice.sh
+```
+
+Or grab the DMG manually from [Releases](https://github.com/s1gmamale1/SigmaVoice/releases/latest) and, after dragging to Applications, run `xattr -cr /Applications/SigmaVoice.app` (or System Settings → Privacy & Security → **Open Anyway**).
+
+SigmaVoice runs in the menu bar. First use prompts for **Microphone** + **Accessibility** (paste), and **Input Monitoring** for push-to-talk — System Settings → Privacy & Security. *(Windows installer coming in a follow-up.)*
+
 ## Architecture — the voice engine lives in a submodule
 
 SigmaVoice is the **app shell**. The voice engine (capture state machine,
