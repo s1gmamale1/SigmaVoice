@@ -9,3 +9,10 @@ release/
 # Logs / OS cruft
 *.log
 .DS_Store
+
+# Ruflo MCP — machine-local config (points CLAUDE_FLOW_DIR at the SHARED SigmaLink
+# store, which is a machine-absolute path) + any local store dir. See CLAUDE.md
+# "Shared Ruflo memory". Recreate per-machine; do not commit the absolute path.
+.mcp.json
+.claude-flow/
+.swarm/

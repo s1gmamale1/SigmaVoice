@@ -45,9 +45,23 @@ Release: push a `v*` tag → `.github/workflows/release.yml` (recursive submodul
 bundle → unsigned DMG/NSIS). macOS validated; **Windows blocked on W-SV1**. Don't tag without
 operator authorization.
 
+## Shared Ruflo memory (single DB across both products)
+
+SigmaLink + SigmaVoice are one production → they **share ONE Ruflo AgentDB**. This repo's
+`.mcp.json` points the ruflo MCP's `CLAUDE_FLOW_DIR` at SigmaLink's store
+(`/Users/aisigma/projects/SigmaLink/.claude-flow`) so patterns/feedback written from either repo
+land in the same store and are retrievable from both (`memory_search_unified`).
+
+- `.mcp.json` is **gitignored** (it holds a machine-absolute path). It exists on the operator's
+  machine; **recreate it per machine** pointing `CLAUDE_FLOW_DIR` at the shared SigmaLink `.claude-flow`.
+- Convention unchanged: **WRITE to namespace `patterns`, READ via `memory_search_unified`**.
+- **Caveat — sequential use only.** Don't run the SigmaLink and SigmaVoice agents *live at the same
+  time*: two ruflo daemons on one sql.js store won't see each other's in-session writes until reload
+  and can contend on locks. Working one repo at a time is fine (committed writes persist + cross-read).
+
 ## Posture (don't relitigate without an ADR)
 macOS arm64 + Windows x64 only · unsigned (mac ad-hoc / win no Authenticode) · engine via submodule
-(single source of truth) · no heavy new deps · wake-word code exists but stays OFF.
+(single source of truth) · shared Ruflo DB (one store, sequential use) · no heavy new deps · wake-word OFF.
 
 ## Docs map
 `docs/HANDOFF.md` (orientation) · `docs/08-bugs/OPEN.md` (bugs+repro) · `docs/04-design/native-gotchas.md`
