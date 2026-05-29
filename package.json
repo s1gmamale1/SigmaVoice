@@ -19,7 +19,8 @@
     "@sigmalink/voice-mac": "link:sigmalink/app/native/voice-mac",
     "@sigmalink/voice-win": "link:sigmalink/app/native/voice-win",
     "@sigmalink/voice-whisper": "link:sigmalink/app/native/voice-whisper",
-    "node-global-key-listener": "^0.3.0"
+    "node-global-key-listener": "^0.3.0",
+    "node-gyp-build": "^4.8.1"
   },
   "peerDependencies": {
     "electron": "*"

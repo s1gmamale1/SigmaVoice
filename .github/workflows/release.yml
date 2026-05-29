@@ -1,11 +1,10 @@
 name: release
 
-# ⚠️ DRAFT — NOT YET VALIDATED ON GITHUB RUNNERS.
-# This produces the standalone SigmaVoice installers, building the shared voice
-# natives from the SigmaLink submodule. The multi-arch native build (whisper.cpp
-# for both arm64 + x64) is the open item and must be validated on a real run
-# before relying on it. Until then, SigmaLink's `release-sigma-voice.yml` remains
-# the proven release path. Trigger is `v*` tags on THIS repo.
+# Produces the standalone SigmaVoice installers (macOS DMG arm64, Windows NSIS
+# x64), unsigned/ad-hoc, on a `v*` tag. The shared voice engine + natives come
+# from the SigmaLink git submodule; the natives are compiled against Electron's
+# ABI with node-gyp (single-arch per platform — no cross-compile), then
+# electron-builder packages them with npmRebuild:false (copy, don't recompile).
 
 on:
   push:
@@ -21,11 +20,11 @@ permissions:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # macOS — unsigned ad-hoc DMG (arm64 + x64)
+  # macOS — unsigned ad-hoc DMG (arm64)
   # ---------------------------------------------------------------------------
   build-macos:
     name: build macos installer
-    runs-on: macos-14
+    runs-on: macos-14            # Apple Silicon → native arm64 build
     timeout-minutes: 40
     steps:
       - name: Checkout (with SigmaLink submodule, recursive for whisper.cpp)
@@ -50,24 +49,21 @@ jobs:
         env:
           npm_config_build_from_source: 'false'
 
-      - name: Install Electron binary (for the ABI target)
-        working-directory: sigmalink/app
-        run: node node_modules/electron/install.js
+      - name: Build voice-mac (arm64, Electron ABI)
+        working-directory: sigmalink/app/native/voice-mac
+        run: npx node-gyp rebuild --target=30.5.1 --arch=arm64 --dist-url=https://electronjs.org/headers
 
-      - name: Rebuild voice natives for Electron (mac + whisper)
-        working-directory: sigmalink/app
+      - name: Build voice-whisper (arm64, Electron ABI)
+        working-directory: sigmalink/app/native/voice-whisper
         env:
           GGML_METAL: 1
-        run: npx @electron/rebuild -f -w sigmavoice_mac -w whisper_bridge
+        run: npx node-gyp rebuild --target=30.5.1 --arch=arm64 --dist-url=https://electronjs.org/headers
 
-      - name: Verify whisper native landed
+      - name: Verify natives landed
         working-directory: sigmalink/app
         run: |
-          if [ -f "native/voice-whisper/build/Release/whisper_bridge.node" ]; then
-            echo "voice-whisper native binary found"
-          else
-            echo "WARNING: voice-whisper binary not found — fell back to stub"
-          fi
+          test -f native/voice-mac/build/Release/sigmavoice_mac.node && echo "voice-mac OK"
+          test -f native/voice-whisper/build/Release/whisper_bridge.node && echo "voice-whisper OK"
 
       # --- Bundle + package the app at the repo root (link: into the submodule). ---
       - name: Install app + bundle (main + preloads)
@@ -132,14 +128,20 @@ jobs:
         env:
           npm_config_build_from_source: 'false'
 
-      - name: Install Electron binary (for the ABI target)
-        working-directory: sigmalink/app
-        run: node node_modules/electron/install.js
+      - name: Build voice-win (x64, Electron ABI)
+        working-directory: sigmalink/app/native/voice-win
+        run: npx node-gyp rebuild --target=30.5.1 --arch=x64 --dist-url=https://electronjs.org/headers
 
-      - name: Rebuild voice natives for Electron (win + whisper)
+      - name: Build voice-whisper (x64, Electron ABI)
+        working-directory: sigmalink/app/native/voice-whisper
+        run: npx node-gyp rebuild --target=30.5.1 --arch=x64 --dist-url=https://electronjs.org/headers
+
+      - name: Verify natives landed
         working-directory: sigmalink/app
-        run: npx @electron/rebuild -f -w sigmavoice_win -w whisper_bridge
-        continue-on-error: true
+        shell: bash
+        run: |
+          test -f native/voice-win/build/Release/sigmavoice_win.node && echo "voice-win OK"
+          test -f native/voice-whisper/build/Release/whisper_bridge.node && echo "voice-whisper OK"
 
       - name: Install app + bundle (main + preloads)
         run: |
