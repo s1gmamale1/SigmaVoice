@@ -27,6 +27,15 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
 
 ---
 
+## ✅ Done — merged to `main` `9e74a81` (2026-05-31; pending release + on-device smoke)
+
+Shipped via `feat/phase-0-quick-wins` (gate-green: `pnpm typecheck`+`pnpm test` 16/16+`pnpm build`; spec+quality reviewed). Marked ✅ inline below.
+- **Phase 0 (all):** UX-1 · UX-5 · UX-9 · UX-10 · UX-11 · UX-12 · UX-15 · FE-9 · CA-3 · CA-4 · CA-5 · CA-6 · CA-8 · PF-1 · PF-4.
+- **Phase 3 (partial):** CA-1 (test harness) · SEC-1 · SEC-2 · SEC-4 · SEC-5.
+- **Descoped:** FE-4 → engine track (Phase 4) — `RouteOpts` has no output-mode hook (needs a `voice-core` change).
+- Per the "when an item ships" convention these move to `master_memory.md` + leave this file only once **released**
+  (tagged DMG after the on-device smoke). Kept here, marked ✅, until then.
+
 ## 🆕 New ideas (untriaged)
 
 - _(empty — capture new ideas here)_
@@ -34,7 +43,7 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
 ---
 
 ## 🅰 Tray & first-run
-- **UX-1** Tray icon is invisible (`nativeImage.createEmpty()` despite `build/icon.*`). `high/S` ⭐ — the
+- ✅ **UX-1** Tray icon is invisible (`nativeImage.createEmpty()` despite `build/icon.*`). `high/S` ⭐ — the
   only persistent affordance for a tray-only app.
 - **FE-1** First-run onboarding + permissions panel (Mic/Accessibility/Input-Monitoring deep links, live
   status, KV first-run flag). `medium/L`
@@ -47,7 +56,7 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
   model rows, iOS toggles). `medium/M`
 - **UX-13** Status tab → dashboard (active model+ready, hotkey as keycaps, mode, live permission grants).
   `medium/M`
-- **UX-5** Fix undefined `.status-badge` class → "✓ Active" renders unstyled. `medium/S`
+- ✅ **UX-5** Fix undefined `.status-badge` class → "✓ Active" renders unstyled. `medium/S`
 - **UX-4** 44pt hit targets (toggle/tabs/×/chips). `medium/M`
 - **UX-19** Render hotkey as ⌘⌥⇧⎵ keycaps, not the raw accelerator string. `low/S`
 - **UX-7** Apple spring motion (CSS `linear()` spring on HUD entrance + toggle). `low/S`
@@ -60,20 +69,20 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
 - **UX-6** Replace the FAKE equalizer with an honest "listening" animation (app-shell now; real audio level
   = 🔧 **ENG-5**). `medium/M`
 - **UX-8** HUD states: idle/error/no-input/done (render now; richer triggers need 🔧 engine). `medium/M`
-- **CA-6** Recording HUD hard time-ceiling (~10 min) + manual dismiss (currently unbounded → can pin over
+- ✅ **CA-6** Recording HUD hard time-ceiling (~10 min) + manual dismiss (currently unbounded → can pin over
   the screen until quit). `medium/S` · bug
 - **UX-20** HUD ARIA live-text matches actual state (currently announces "recording" in idle fallback).
   `low/S`
 
 ## 🅳 Features (dictation product)
-- **FE-4** Clipboard-only output toggle (skip AX-paste) — BridgeVoice just shipped this; wins the
+- ⛔→🅷 **FE-4 (moved to engine track, Phase 4)** Clipboard-only output toggle (skip AX-paste) — BridgeVoice just shipped this; wins the
   focus-loss case. `high(daily)/S` ⭐
-- **FE-9** Model download: determinate progress bar + MB/MB + wire the **already-plumbed** Cancel
+- ✅ **FE-9** Model download: determinate progress bar + MB/MB + wire the **already-plumbed** Cancel
   (`abortDownload`). `medium/S` ⭐
 - **FE-5** Usage: add **WPM + Sessions** + an "Overview" dashboard (hero cards + recent activity).
   BridgeVoice parity. `medium/S`
 - **FE-6** Searchable transcription history + per-row "Add to Dictionary." `medium/M`
-- **UX-15** Dictionary: real empty state (stop injecting fake example rows that get saved as real data).
+- ✅ **UX-15** Dictionary: real empty state (stop injecting fake example rows that get saved as real data).
   `medium/S`
 - **FE-7** Dictionary "`@repo`/agent-reference" recipes (examples + docs) — BridgeVoice headline trick.
   `medium/S`
@@ -89,28 +98,28 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
   (🔧 model config). `low/S`
 
 ## 🅴 Performance & smoothness
-- **PF-1** Whisper model prewarm after enable — kills first-dictation cold-start lag (app-shell-feasible).
+- ✅ **PF-1** Whisper model prewarm after enable — kills first-dictation cold-start lag (app-shell-feasible).
   `medium/S` ⭐
 - **PF-2** Whisper context idle-eviction (+ at-quit dispose) — reclaim 150 MB–2 GB mid-session. `low/M`
 - **PF-3** HUD idle teardown (destroy the blurred transparent window after idle). `low/M`
-- **PF-4** HUD clock: `setInterval` not 60fps `requestAnimationFrame` for a 1-second display. `low/S`
+- ✅ **PF-4** HUD clock: `setInterval` not 60fps `requestAnimationFrame` for a 1-second display. `low/S`
 - **PF-5** KV: debounce/async persist (stop the synchronous full-store rewrite on the dictation path).
   `low/S`
 - **PF-7** Document the KV "whole-map rewrite per set" assumption. `low/S`
 
 ## 🅵 Code, architecture & longevity
-- **CA-1** App-shell test harness (`node:test`+`tsx`) for the 3 pure modules + a `pnpm test` CI step.
+- ✅ **CA-1** App-shell test harness (`node:test`+`tsx`) for the 3 pure modules + a `pnpm test` CI step.
   `medium/M`
-- **CA-3** `whenReady()` try/catch → degraded tray + notification (no silent inert boot). `medium/S` · bug
-- **UX-10** Hotkey save: validate + honest success/fail toast (today it always toasts "updated"). `medium/S`
+- ✅ **CA-3** `whenReady()` try/catch → degraded tray + notification (no silent inert boot). `medium/S` · bug
+- ✅ **UX-10** Hotkey save: validate + honest success/fail toast (today it always toasts "updated"). `medium/S`
 - **CA-2** Split `settings.html` (1390 lines → html + css + JS modules, <500 each). `medium/M`
-- **CA-8** Fix `pnpm dev` (`electron src/main.ts` can't run raw ESM TS — add `tsx` or build-then-run).
+- ✅ **CA-8** Fix `pnpm dev` (`electron src/main.ts` can't run raw ESM TS — add `tsx` or build-then-run).
   `low/S` · bug
-- **CA-4** De-dupe the push-to-talk-degraded notification (two call sites). `low/S` · bug
-- **UX-12** Dictionary save: report dropped over-long entries (use the sanitized return value). `low/S`
-- **UX-9** Usage tab auto-refresh on activation (currently stale until manual Refresh). `low/S`
-- **UX-11** `second-instance` should `.focus()` the created settings window (Dock-hidden surfacing). `low/S`
-- **CA-5** Remove dead code (`void os`, `HudLike` dup, unused `refresh()`). `low/S`
+- ✅ **CA-4** De-dupe the push-to-talk-degraded notification (two call sites). `low/S` · bug
+- ✅ **UX-12** Dictionary save: report dropped over-long entries (use the sanitized return value). `low/S`
+- ✅ **UX-9** Usage tab auto-refresh on activation (currently stale until manual Refresh). `low/S`
+- ✅ **UX-11** `second-instance` should `.focus()` the created settings window (Dock-hidden surfacing). `low/S`
+- ✅ **CA-5** Remove dead code (`void os`, `HudLike` dup, unused `refresh()`). `low/S`
 - **CA-7** `build.cjs`: update stale comments; optional prune Drizzle externals; optional `--watch`. `low/S`
 
 ## 🅶 Security & privacy
@@ -118,11 +127,11 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
   clear/restore. `medium/M` (policy app-shell; durable fix 🔧 engine)
 - **SEC-3** Commit `pnpm-lock.yaml` + CI `--frozen-lockfile` + non-blocking `pnpm audit`. `medium/S`
 - **SEC-7** macOS installer: per-release SHA-256 verify + `vX.Y.Z` tag regex + explicit sudo. `medium/M`
-- **SEC-1** Add a strict CSP to both renderers (defense-in-depth; no live XSS today). `low/S`
-- **SEC-2** Navigation / `setWindowOpenHandler` hardening. `low/S`
-- **SEC-4** `sandbox:true` on all windows (preloads are sandbox-safe). `low/S`
-- **SEC-5** Cap dictionary `replacement` length + strip control chars. `low/S`
-- **SEC-9** IPC consistency: bound the `setHotkey` accelerator + coerce `setEnabled` to boolean. (Do **not**
+- ✅ **SEC-1** Add a strict CSP to both renderers (defense-in-depth; no live XSS today). `low/S`
+- ✅ **SEC-2** Navigation / `setWindowOpenHandler` hardening. `low/S`
+- ✅ **SEC-4** `sandbox:true` on all windows (preloads are sandbox-safe). `low/S`
+- ✅ **SEC-5** Cap dictionary `replacement` length + strip control chars. `low/S`
+- 🟡 **SEC-9** (partial — `setHotkey` validation ✅ shipped via UX-10) IPC consistency: bound the `setHotkey` accelerator + coerce `setEnabled` to boolean. (Do **not**
   re-validate `setModelId` — the engine already does.) `low/S`
 - **SEC-8** `adhoc-sign.cjs`: scope the `spawn-helper` chmod; move off `codesign --deep`. `low/M`
 

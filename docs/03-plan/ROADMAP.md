@@ -55,7 +55,7 @@ preloads and the tray/HUD/hotkey/paste flow works (sandbox + CSP can't be verifi
 
 ---
 
-## Confirmed bugs to fix first (hotlist)
+## Confirmed bugs to fix first (hotlist) — ✅ ALL FIXED in Phase 0 (merged to `main` `9e74a81`)
 
 App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W-SV2/ENG-3 are in Phase 4.)
 
@@ -72,7 +72,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 0 — Make it present, functional & honest
+## Phase 0 — Make it present, functional & honest — ✅ DONE (merged to `main` `9e74a81`; pending release + on-device smoke)
 
 **Goal.** The tray app is visibly present, never boots into a silent inert state, gives truthful feedback on every action, and the first dictation of a session is fast.
 
@@ -105,7 +105,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 1 — Apple-grade UI/UX pass
+## Phase 1 — Apple-grade UI/UX pass — ⬜ PENDING (objective subset Playwright-verifiable; subjective restyle needs operator design review)
 
 **Goal.** The settings window and recording HUD look and behave Cupertino-grade — adaptive appearance, real materials, honest feedback, spring motion, and accessible targets.
 
@@ -130,7 +130,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 2 — Signature features (BridgeVoice parity + beyond)
+## Phase 2 — Signature features (BridgeVoice parity + beyond) — ⬜ PENDING
 
 **Goal.** SigmaVoice is a daily-driver dictation tool: a persistent floating pill, a guided first run, searchable history, mic selection, and an optional local prompt-cleanup pass.
 
@@ -154,7 +154,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 3 — Longevity, security & performance hardening
+## Phase 3 — Longevity, security & performance hardening — 🟡 PARTIAL (CA-1 + SEC-1/2/4/5 ✅ on `main`; CA-2 · SEC-3/6/7/8 · PF-2/3/5/7 pending)
 
 **Goal.** The app-shell is testable, the supply chain is pinned, clipboard privacy residue is handled, and idle resource use is bounded.
 
@@ -179,7 +179,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 4 — Engine / native (🔧 SigmaLink submodule)
+## Phase 4 — Engine / native (🔧 SigmaLink submodule) — ⬜ PENDING (needs Windows CI runner + submodule edits)
 
 **Goal.** Windows builds and pastes, per-dictation latency drops, and the quit-time crash + cloud-path hang are fixed — all authored upstream in SigmaLink and pulled in via a submodule-pin bump.
 
