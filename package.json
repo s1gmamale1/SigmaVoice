@@ -7,7 +7,7 @@
   "type": "module",
   "main": "sigma-dist/main.js",
   "scripts": {
-    "dev": "electron src/main.ts",
+    "dev": "node scripts/build.cjs && electron sigma-dist/main.js",
     "typecheck": "tsc --noEmit",
     "compile": "node scripts/build.cjs",
     "build": "node scripts/build.cjs",

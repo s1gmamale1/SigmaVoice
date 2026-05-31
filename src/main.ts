@@ -11,7 +11,6 @@
 // No workspace/pane/session/swarm logic — this is pure dictation.
 
 import path from 'node:path';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   app,
@@ -32,10 +31,15 @@ import {
   abortDownload,
   isDownloading,
   type DownloadProgress,
+  getWhisperEngine,
+  getModelById,
+  getDefaultModel,
+  getDownloadedModelPath,
+  WHISPER_SAMPLE_RATE,
 } from '@sigmalink/voice-core';
 import { createFileKv, type KvStore } from './kv-store';
 import { getDictionary, setDictionary, getStatsSummary } from './settings-data';
-import { createHudWindow } from './hud-window';
+import { createHudWindow, type HudController } from './hud-window';
 import { createHotkeyManager, type HotkeyManager } from './hotkey-manager';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -66,23 +70,21 @@ let settingsWindow: BrowserWindow | null = null;
 let captureCtrl: GlobalCaptureController | null = null;
 
 // Focus-preserving recording HUD overlay. Assigned in whenReady() to the
-// controller returned by createHudWindow() (src/hud-window.ts); structurally
-// typed here so this file is independent of that module's import.
-interface HudLike {
-  showRecording(): void;
-  showTranscribing(): void;
-  hide(): void;
-  destroy(): void;
-}
-let hud: HudLike | null = null;
+// controller returned by createHudWindow() (src/hud-window.ts).
+let hud: HudController | null = null;
 let hotkeyMgr: HotkeyManager | null = null;
 // True when the global key-UP listener could not attach (e.g. Input Monitoring
 // not granted). In push-to-talk mode this means hold-to-talk is unavailable and
 // the hotkey degrades to tap-to-toggle — we tell the user when it matters.
 let pttListenerUnavailable = false;
+// True once we've warned the user about degraded push-to-talk — the warning is
+// shown at most once per session (it can be triggered from multiple paths).
+let degradedWarned = false;
 
 /** Notify the user that push-to-talk degraded to tap-to-toggle. */
 function warnPushToTalkDegraded(): void {
+  if (degradedWarned) return;
+  degradedWarned = true;
   const body =
     'Hold-to-talk needs Input Monitoring (System Settings → Privacy & ' +
     'Security → Input Monitoring). Until granted, the hotkey works as ' +
@@ -165,8 +167,13 @@ function updateTray(): void {
 }
 
 function initTray(): void {
-  // Use a 16×16 transparent icon stub — replace with actual icon in production
-  const icon = nativeImage.createEmpty();
+  // Idempotent: the boot-failure catch path also calls initTray(), and a second
+  // `new Tray()` would leak the first (a lingering macOS menu-bar icon).
+  if (tray && !tray.isDestroyed()) return;
+  // Load the bundled tray PNG; fall back to an empty image if missing/unreadable.
+  const iconPath = path.join(__dirname, '..', 'renderer', 'assets', 'tray-icon.png');
+  let icon = nativeImage.createFromPath(iconPath);
+  icon = icon.isEmpty() ? nativeImage.createEmpty() : icon.resize({ width: 18, height: 18 });
   tray = new Tray(icon);
   tray.setToolTip('SigmaVoice');
   tray.setContextMenu(buildTrayMenu());
@@ -198,8 +205,42 @@ function openSettingsWindow(): void {
   });
 
   settingsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
-  settingsWindow.once('ready-to-show', () => settingsWindow?.show());
+  settingsWindow.once('ready-to-show', () => {
+    settingsWindow?.show();
+    settingsWindow?.focus();
+    if (process.platform === 'darwin') app.focus({ steal: true });
+  });
   settingsWindow.on('closed', () => { settingsWindow = null; });
+}
+
+// ---------------------------------------------------------------------------
+// Hotkey validation — reject accelerators Electron can't register so the UI can
+// report failure instead of silently dropping the shortcut.
+// ---------------------------------------------------------------------------
+
+/** True if `s` is a registerable accelerator: >=1 modifier + a trailing key. */
+function isValidAccelerator(s: string): boolean {
+  const MODIFIERS = new Set([
+    'CommandOrControl', 'CmdOrCtrl', 'Command', 'Cmd', 'Control', 'Ctrl',
+    'Alt', 'Option', 'AltGr', 'Shift', 'Super', 'Meta',
+  ]);
+  const NAMED_KEYS = new Set([
+    'Space', 'Tab', 'Backspace', 'Delete', 'Insert', 'Return', 'Enter',
+    'Up', 'Down', 'Left', 'Right', 'Home', 'End', 'PageUp', 'PageDown',
+    'Escape', 'Esc', 'Plus',
+  ]);
+  const tokens = s.split('+');
+  if (tokens.length < 2) return false; // need >=1 modifier + a key
+  const key = tokens[tokens.length - 1];
+  const isKey =
+    /^[A-Za-z0-9]$/.test(key) ||
+    /^F([1-9]|1[0-9]|2[0-4])$/.test(key) ||
+    NAMED_KEYS.has(key) ||
+    // single punctuation key — Electron accepts e.g. / = . ; , [ ] - ` ' \
+    (key.length === 1 && /[^A-Za-z0-9\s]/.test(key));
+  if (!isKey) return false;
+  const mods = tokens.slice(0, -1);
+  return mods.length >= 1 && mods.every((m) => MODIFIERS.has(m));
 }
 
 // ---------------------------------------------------------------------------
@@ -215,11 +256,16 @@ function registerIpc(): void {
     captureCtrl?.setEnabled(enabled);
   });
 
-  // Change hotkey
-  ipcMain.handle('bv:setHotkey', (_e, hotkey: string) => {
-    if (typeof hotkey === 'string' && hotkey.trim()) {
-      captureCtrl?.setHotkey(hotkey.trim());
+  // Change hotkey — validate first so the UI can report an unregisterable
+  // accelerator instead of us silently dropping it.
+  ipcMain.handle('bv:setHotkey', (_e, hotkey: string): { ok: boolean; error?: string } => {
+    const hk = typeof hotkey === 'string' ? hotkey.trim() : '';
+    if (!isValidAccelerator(hk)) {
+      return { ok: false, error: 'Invalid shortcut — include a modifier (⌘/⌥/⌃/⇧) plus a key' };
     }
+    if (!captureCtrl) return { ok: false, error: 'Capture unavailable — reopen SigmaVoice' };
+    captureCtrl.setHotkey(hk);
+    return { ok: true };
   });
 
   // Change capture mode (toggle vs push-to-talk)
@@ -235,6 +281,7 @@ function registerIpc(): void {
   // Change active model
   ipcMain.handle('bv:setModelId', (_e, id: string) => {
     captureCtrl?.setModelId(id);
+    prewarmModel();
   });
 
   // Manual trigger (for settings UI test button)
@@ -274,7 +321,9 @@ function registerIpc(): void {
   ipcMain.handle('bv:downloadModel', async (_e, id: string) => {
     const entry = MODEL_CATALOG.find((m) => m.id === id);
     if (!entry) return { ok: false, error: `Unknown model: ${id}` };
-    const emit = (p: DownloadProgress): void => {
+    // The renderer understands an optional `aborted` terminal flag — a user cancel
+    // is a clean stop, not a failure — so the local emit widens the payload type.
+    const emit = (p: DownloadProgress & { aborted?: boolean }): void => {
       if (settingsWindow && !settingsWindow.isDestroyed()) {
         settingsWindow.webContents.send('voice:model-download', p);
       }
@@ -284,6 +333,12 @@ function registerIpc(): void {
       return { ok: true };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      // A user-initiated cancel rejects with an "abort" message → surface it as a
+      // clean terminal state (row resets, no error toast), not a download failure.
+      if (/abort/i.test(message)) {
+        emit({ modelId: id, bytesDone: 0, bytesTotal: 0, fraction: 0, done: true, aborted: true });
+        return { ok: true, aborted: true };
+      }
       emit({ modelId: id, bytesDone: 0, bytesTotal: 0, fraction: 0, done: true, error: message });
       return { ok: false, error: message };
     }
@@ -293,6 +348,34 @@ function registerIpc(): void {
   ipcMain.handle('bv:abortDownload', (_e, id: string) => {
     try { abortDownload(id); } catch { /* ignore */ }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Whisper prewarm — run a throwaway transcription on silence so the first real
+// dictation isn't slowed by lazy model load / engine init. Best-effort: any
+// failure (no model downloaded yet, engine unavailable) is swallowed.
+// ---------------------------------------------------------------------------
+
+let lastWarmedModelPath: string | null = null;
+
+function prewarmModel(): void {
+  try {
+    const st = captureCtrl?.getStatus();
+    // Don't fire a throwaway transcribe while a real capture is mid-flight — it
+    // would contend with the active session. Only prewarm when idle.
+    if (st && st.state !== 'idle') return;
+    const model = (st?.modelId ? getModelById(st.modelId) : null) ?? getDefaultModel();
+    const modelPath = getDownloadedModelPath(model, getModelsDir());
+    if (!modelPath || modelPath === lastWarmedModelPath) return; // nothing to do / already warm
+    const eng = getWhisperEngine();
+    if (!eng) return;
+    lastWarmedModelPath = modelPath;
+    void eng
+      .transcribe(new Float32Array(WHISPER_SAMPLE_RATE), modelPath, { language: 'en', threads: 4 })
+      .catch(() => { lastWarmedModelPath = null; }); // let a failed warm be retried
+  } catch {
+    /* best-effort */
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -312,58 +395,79 @@ if (!isPrimaryInstance) {
 app.whenReady().then(() => {
   if (!isPrimaryInstance) return; // secondary instance is quitting
 
-  // macOS: hide from Dock (system-tray-only app)
-  if (process.platform === 'darwin') {
-    app.dock?.hide();
+  try {
+    // macOS: hide from Dock (system-tray-only app)
+    if (process.platform === 'darwin') {
+      app.dock?.hide();
+    }
+
+    // Persistent KV — created now that userData is resolvable.
+    const store = createFileKv(path.join(app.getPath('userData'), 'sigmavoice-kv.json'));
+    kv = store;
+
+    captureCtrl = buildGlobalCaptureController({
+      emit: (event, payload) => {
+        // Forward to settings window if open
+        if (settingsWindow && !settingsWindow.isDestroyed()) {
+          settingsWindow.webContents.send(event, payload);
+        }
+        // Rebuild tray menu + drive the recording HUD on state changes
+        if (event === 'voice:global-capture-state') {
+          updateTray();
+          syncHud(payload);
+        }
+      },
+      kv: store,
+      getModelsDir,
+      clipboard: {
+        writeText: (text: string) => clipboard.writeText(text),
+      },
+    });
+
+    // Focus-preserving recording HUD overlay (lazily shown on first record).
+    hud = createHudWindow({
+      preloadPath: path.join(__dirname, 'hud-preload.cjs'),
+      htmlPath: path.join(__dirname, '..', 'renderer', 'hud.html'),
+    });
+
+    // True push-to-talk: supply the key-UP edge Electron's globalShortcut lacks.
+    // Key-DOWN/start stays on the controller's globalShortcut; on release in
+    // push-to-talk mode we stop+transcribe. (Toggle mode is fully owned by the
+    // controller, so this is a no-op there.)
+    hotkeyMgr = createHotkeyManager({
+      getMode: () => captureCtrl?.getStatus().mode ?? 'toggle',
+      getHotkey: () => captureCtrl?.getStatus().hotkey ?? '',
+      onPushToTalkRelease: () => { void captureCtrl?.stopAndTranscribe(); },
+      onListenerUnavailable: () => {
+        pttListenerUnavailable = true;
+        // Only worth telling the user if they're actually in push-to-talk mode.
+        if (captureCtrl?.getStatus().mode === 'push-to-talk') warnPushToTalkDegraded();
+      },
+    });
+    hotkeyMgr.start();
+
+    initTray();
+    registerIpc();
+
+    // Warm the whisper engine on silence so the first dictation isn't slow.
+    prewarmModel();
+  } catch (err) {
+    // A throw during boot (e.g. buildGlobalCaptureController) must not leave a
+    // silent inert process — surface it and still give the user a Quit-able tray.
+    console.error(err);
+    try {
+      if (Notification.isSupported()) {
+        new Notification({
+          title: 'SigmaVoice failed to start',
+          body: String((err as Error)?.message ?? err),
+        }).show();
+      }
+    } catch {
+      /* notifications are best-effort */
+    }
+    // buildTrayMenu already null-guards captureCtrl, so a tray is safe here.
+    try { initTray(); } catch { /* ignore */ }
   }
-
-  // Persistent KV — created now that userData is resolvable.
-  const store = createFileKv(path.join(app.getPath('userData'), 'sigmavoice-kv.json'));
-  kv = store;
-
-  captureCtrl = buildGlobalCaptureController({
-    emit: (event, payload) => {
-      // Forward to settings window if open
-      if (settingsWindow && !settingsWindow.isDestroyed()) {
-        settingsWindow.webContents.send(event, payload);
-      }
-      // Rebuild tray menu + drive the recording HUD on state changes
-      if (event === 'voice:global-capture-state') {
-        updateTray();
-        syncHud(payload);
-      }
-    },
-    kv: store,
-    getModelsDir,
-    clipboard: {
-      writeText: (text: string) => clipboard.writeText(text),
-    },
-  });
-
-  // Focus-preserving recording HUD overlay (lazily shown on first record).
-  hud = createHudWindow({
-    preloadPath: path.join(__dirname, 'hud-preload.cjs'),
-    htmlPath: path.join(__dirname, '..', 'renderer', 'hud.html'),
-  });
-
-  // True push-to-talk: supply the key-UP edge Electron's globalShortcut lacks.
-  // Key-DOWN/start stays on the controller's globalShortcut; on release in
-  // push-to-talk mode we stop+transcribe. (Toggle mode is fully owned by the
-  // controller, so this is a no-op there.)
-  hotkeyMgr = createHotkeyManager({
-    getMode: () => captureCtrl?.getStatus().mode ?? 'toggle',
-    getHotkey: () => captureCtrl?.getStatus().hotkey ?? '',
-    onPushToTalkRelease: () => { void captureCtrl?.stopAndTranscribe(); },
-    onListenerUnavailable: () => {
-      pttListenerUnavailable = true;
-      // Only worth telling the user if they're actually in push-to-talk mode.
-      if (captureCtrl?.getStatus().mode === 'push-to-talk') warnPushToTalkDegraded();
-    },
-  });
-  hotkeyMgr.start();
-
-  initTray();
-  registerIpc();
 });
 
 // Keep app alive when all windows are closed (tray app)
@@ -391,6 +495,3 @@ app.on('activate', () => {
     openSettingsWindow();
   }
 });
-
-// Keep TypeScript happy about unused import
-void os;

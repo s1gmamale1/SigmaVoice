@@ -441,6 +441,23 @@
     }
     .btn:disabled:active { transform: none; }
 
+    /* ── Download progress bar ───────────────────────────────── */
+    .dl-progress {
+      width:         100%;
+      height:        4px;
+      border-radius: 100px;
+      background:    var(--fill-secondary);
+      overflow:      hidden;
+      margin-top:    6px;
+    }
+    .dl-progress-fill {
+      height:        100%;
+      width:         0%;
+      border-radius: 100px;
+      background:    var(--accent);
+      transition:    width var(--dur-mid) var(--ease-out);
+    }
+
     /* ── Record button (big) ─────────────────────────────────── */
     .record-btn-wrap {
       display:         flex;
@@ -853,7 +870,7 @@
       </div>
 
       <p class="section-header" style="color: var(--label-disabled); font-size:10px; padding-top:4px;">
-        Tip — macros can contain special characters: type "new line" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">\n</code>
+        Tip — macros can contain special characters, e.g. "new line" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">\n</code>, "open brace" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">{</code>, "close brace" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">}</code>. Phrases rewrite spoken words, e.g. "sigma link" → SigmaLink.
       </p>
 
     </div>
@@ -967,10 +984,11 @@
       panels.forEach(p => {
         p.classList.toggle('active', p.id === targetPanelId);
       });
-      // Lazy-load panel data when first activated
+      // Lazy-load dictionary once (avoid discarding unsaved edits); the usage
+      // panel re-fetches on every activation (getStats is a cheap sync KV read).
       const panel = tabEl.dataset.panel;
       if (panel === 'dictionary') loadDictionary();
-      if (panel === 'usage')      loadStats();
+      if (panel === 'usage')      fetchAndRenderStats();
     }
 
     tabs.forEach(tab => {
@@ -1061,10 +1079,12 @@
 
     // ── Hotkey ────────────────────────────────────────────────────
     document.getElementById('hotkey-save-btn').addEventListener('click', async () => {
-      const hotkey = document.getElementById('hotkey-input').value.trim();
-      if (!hotkey) return;
-      await safeCall('setHotkey', hotkey);
-      showToast('Hotkey updated: ' + hotkey);
+      const value = document.getElementById('hotkey-input').value.trim();
+      if (!value) return;
+      if (!hasMethod('setHotkey')) { showToast('SigmaVoice bridge unavailable', 'warn'); return; }
+      const res = await bv.setHotkey(value);
+      if (res?.ok) showToast('Hotkey updated', 'info');
+      else showToast(res?.error || 'Could not set shortcut', 'error');
     });
 
     // ── Mode segmented control ────────────────────────────────────
@@ -1127,7 +1147,7 @@
 
         if (m.active) {
           const tag = document.createElement('span');
-          tag.className = 'status-badge';
+          tag.className = 'state-badge routing';
           tag.textContent = '✓ Active';
           right.appendChild(tag);
         } else if (m.downloaded) {
@@ -1139,7 +1159,7 @@
           });
           right.appendChild(use);
         } else if (m.downloading) {
-          sub.textContent = 'Downloading…';
+          enterDownloadingUI(m, left, right);
         } else {
           const dl = makeBtn('Download', 'btn-primary');
           dl.addEventListener('click', () => startDownload(m));
@@ -1151,15 +1171,39 @@
       }
     }
 
+    // Switch a model row into its determinate "downloading" state:
+    // a thin progress bar + byte counter under the name, a Cancel button.
+    function enterDownloadingUI(m, left, right) {
+      const sub = document.getElementById('model-sub-' + m.id);
+      if (sub) sub.textContent = 'Downloading…';
+
+      const bar = document.createElement('div');
+      bar.className = 'dl-progress';
+      bar.id = 'model-progress-' + m.id;
+      const fill = document.createElement('div');
+      fill.className = 'dl-progress-fill';
+      fill.id = 'model-progress-fill-' + m.id;
+      bar.appendChild(fill);
+      left.appendChild(bar);
+
+      right.replaceChildren();
+      const cancel = makeBtn('Cancel', 'btn-secondary');
+      cancel.addEventListener('click', () => safeCall('abortDownload', m.id));
+      right.appendChild(cancel);
+    }
+
     async function startDownload(m) {
       if (!hasMethod('downloadModel')) return;
       const sub = document.getElementById('model-sub-' + m.id);
       const action = document.getElementById('model-action-' + m.id);
+      // left cell is the parent of the sublabel; show the progress bar there
+      const left = sub?.parentElement;
       if (sub) sub.textContent = 'Starting…';
-      if (action) action.replaceChildren();
+      if (left && action) enterDownloadingUI(m, left, action);
       try {
         const res = await bv.downloadModel(m.id);
-        if (res && res.ok === false) showToast('Download failed: ' + (res.error || 'unknown'), 'error');
+        if (res?.aborted) showToast('Download cancelled', 'info');
+        else if (res && res.ok === false) showToast('Download failed: ' + (res.error || 'unknown'), 'error');
       } catch (err) {
         showToast('Download failed', 'error');
       }
@@ -1171,10 +1215,17 @@
         if (!p || !p.modelId) return;
         const sub = document.getElementById('model-sub-' + p.modelId);
         if (!sub) return;
-        if (p.error) { sub.textContent = 'Failed: ' + p.error; return; }
-        if (p.done) { sub.textContent = 'Downloaded'; renderModels(); return; }
-        const pct = Math.round((p.fraction || 0) * 100);
-        sub.textContent = 'Downloading… ' + pct + '%';
+        // Terminal states reset the row to its idle layout
+        if (p.error)    { showToast('Download failed: ' + p.error, 'error'); renderModels(); return; }
+        if (p.aborted)  { renderModels(); return; }
+        if (p.done)     { sub.textContent = 'Downloaded'; renderModels(); return; }
+        const fill = document.getElementById('model-progress-fill-' + p.modelId);
+        if (fill) fill.style.width = ((p.fraction || 0) * 100) + '%';
+        if (p.bytesTotal) {
+          sub.textContent = (p.bytesDone / 1e6).toFixed(0) + ' of ' + (p.bytesTotal / 1e6).toFixed(0) + ' MB';
+        } else {
+          sub.textContent = 'Downloading… ' + Math.round((p.fraction || 0) * 100) + '%';
+        }
       });
     }
 
@@ -1197,22 +1248,25 @@
     async function loadDictionary() {
       if (dictLoaded) return;
       dictLoaded = true;
-      let entries = await safeCall('getDictionary');
-      if (!Array.isArray(entries) || entries.length === 0) {
-        // Populate with helpful placeholder examples when empty
-        entries = [
-          { pattern: 'new line',    replacement: '\n',  type: 'macro'  },
-          { pattern: 'open brace',  replacement: '{',   type: 'macro'  },
-          { pattern: 'close brace', replacement: '}',   type: 'macro'  },
-          { pattern: 'sigma link',  replacement: 'SigmaLink', type: 'phrase' },
-        ];
-      }
-      renderDictionary(entries);
+      const entries = await safeCall('getDictionary');
+      renderDictionary(Array.isArray(entries) ? entries : []);
     }
 
     function renderDictionary(entries) {
       const body = document.getElementById('dict-body');
       body.replaceChildren();
+      if (!entries.length) {
+        // Genuine empty state — a single muted message row (not saved as data)
+        const tr = document.createElement('tr');
+        tr.className = 'dict-empty-row';
+        const td = document.createElement('td');
+        td.colSpan = 4;
+        td.className = 'stats-empty';
+        td.textContent = 'No phrases or macros yet — use “+ Add entry”.';
+        tr.appendChild(td);
+        body.appendChild(tr);
+        return;
+      }
       entries.forEach(entry => appendDictRow(entry));
     }
 
@@ -1277,6 +1331,8 @@
     }
 
     document.getElementById('dict-add-btn').addEventListener('click', () => {
+      // Clear the empty-state placeholder before adding the first real row
+      document.querySelector('#dict-body .dict-empty-row')?.remove();
       appendDictRow({ pattern: '', replacement: '', type: 'phrase' });
       // Focus the new pattern input
       const rows = document.querySelectorAll('#dict-body tr');
@@ -1295,19 +1351,17 @@
         const type        = chip?.dataset.type ?? 'phrase';
         if (pattern) entries.push({ pattern, replacement, type });
       });
-      await safeCall('setDictionary', entries);
-      showToast(`Saved ${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`);
+      if (!hasMethod('setDictionary')) { showToast('SigmaVoice bridge unavailable', 'warn'); return; }
+      const saved = (await bv.setDictionary(entries)) ?? [];
+      if (!Array.isArray(saved)) { showToast('Could not save dictionary', 'error'); return; }
+      if (saved.length < entries.length) {
+        showToast(`Saved ${saved.length} entries; ${entries.length - saved.length} dropped (empty or too long)`, 'warn');
+      } else {
+        showToast(`Saved ${saved.length} entries`, 'info');
+      }
     });
 
     // ── Usage / Stats ─────────────────────────────────────────────
-    let statsLoaded = false;
-
-    async function loadStats() {
-      if (statsLoaded) return;
-      statsLoaded = true;
-      await fetchAndRenderStats();
-    }
-
     async function fetchAndRenderStats() {
       const stats = await safeCall('getStats');
       renderStats(stats);
@@ -1360,9 +1414,7 @@
     }
 
     document.getElementById('stats-refresh-btn').addEventListener('click', async () => {
-      statsLoaded = false;
       await fetchAndRenderStats();
-      statsLoaded = true;
       showToast('Stats refreshed');
     });
 

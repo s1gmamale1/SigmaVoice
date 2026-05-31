@@ -69,6 +69,13 @@ const HUD_MARGIN_BOTTOM = 48; // gap above the Dock / screen edge
 // run for minutes); only the post-capture tail is time-bounded.
 const TRANSCRIBE_SAFETY_MS = 90_000;
 
+// Recording, unlike transcribing, can legitimately run for minutes — so it gets
+// a far more generous ceiling rather than the brief post-capture cap. This is a
+// last-resort guard against the same missed-'idle' failure mode: if the capture
+// controller never emits a terminal state, the always-on-top overlay would pin
+// over the user's work indefinitely. Bound that at 10 minutes.
+const RECORD_SAFETY_MS = 10 * 60_000;
+
 export function createHudWindow(deps: HudWindowDeps): HudController {
   let win: BrowserWindow | null = null;
   // Tracks whether the renderer has finished its initial load. State sends
@@ -153,6 +160,7 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
     });
 
     win.on('closed', () => {
+      clearSafetyTimer();
       win = null;
       ready = false;
       pendingState = null;
@@ -192,9 +200,13 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
 
   return {
     showRecording(): void {
-      clearSafetyTimer(); // recording is not time-bounded
       showInactive();
       sendState('recording');
+      // Recording isn't tightly time-bounded like transcribing, but still arm a
+      // generous last-resort auto-hide so a missed terminal 'idle' can't pin the
+      // overlay forever.
+      clearSafetyTimer();
+      safetyTimer = setTimeout(doHide, RECORD_SAFETY_MS);
     },
     showTranscribing(): void {
       // Don't create the window solely to show 'transcribing'; only meaningful
