@@ -199,11 +199,22 @@ function openSettingsWindow(): void {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
+      // Defense-in-depth: the preload (src/preload.ts) imports only
+      // contextBridge/ipcRenderer from 'electron' and uses no other Node APIs,
+      // so it loads cleanly under sandbox. sandbox:true runs the renderer in a
+      // locked-down process with no Node primitives.
+      sandbox: true,
       // The build emits preload.cjs (CJS) into sigma-dist/ — NOT preload.js.
       // v0.2 referenced 'preload.js' here, so window.bridgeVoice never loaded.
       preload: path.join(__dirname, 'preload.cjs'),
     },
   });
+
+  // Defense-in-depth navigation hardening: this window only ever renders the
+  // bundled file:// settings page. Deny window.open and block any in-page
+  // navigation away from it.
+  settingsWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  settingsWindow.webContents.on('will-navigate', (e) => e.preventDefault());
 
   settingsWindow.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'));
   settingsWindow.once('ready-to-show', () => {

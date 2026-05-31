@@ -133,9 +133,18 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
       webPreferences: {
         contextIsolation: true,
         nodeIntegration: false,
+        // Defense-in-depth: hud-preload (src/hud-preload.ts) imports only
+        // contextBridge/ipcRenderer from 'electron' and uses no other Node APIs,
+        // so it loads cleanly under sandbox.
+        sandbox: true,
         preload: deps.preloadPath,
       },
     });
+
+    // Defense-in-depth navigation hardening: the HUD only ever renders the
+    // bundled file:// overlay. Deny window.open and block any in-page navigation.
+    win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    win.webContents.on('will-navigate', (e) => e.preventDefault());
 
     // Float above normal windows AND above full-screen apps the user may be
     // dictating into. 'screen-saver' is the highest standard level.

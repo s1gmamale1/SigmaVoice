@@ -32,6 +32,36 @@ test('setDictionary sanitizes rows and returns the clean list', () => {
   assert.deepEqual(JSON.parse(kv.get('voice.dictionary')!), result);
 });
 
+test('setDictionary drops a row whose replacement exceeds the cap (>2000)', () => {
+  const kv = fakeKv();
+  const result = setDictionary(kv, [
+    { pattern: 'ok', replacement: 'okay', type: 'phrase' }, // valid → keep
+    { pattern: 'big', replacement: 'z'.repeat(2001), type: 'macro' }, // >2000 → drop
+    { pattern: 'edge', replacement: 'z'.repeat(2000), type: 'macro' }, // exactly 2000 → keep
+  ]);
+
+  assert.deepEqual(result, [
+    { pattern: 'ok', replacement: 'okay', type: 'phrase' },
+    { pattern: 'edge', replacement: 'z'.repeat(2000), type: 'macro' },
+  ]);
+  // The over-long replacement row is absent from what was persisted.
+  assert.deepEqual(JSON.parse(kv.get('voice.dictionary')!), result);
+});
+
+test('setDictionary strips control chars from replacement but keeps \\n and \\t', () => {
+  const kv = fakeKv();
+  const result = setDictionary(kv, [
+    // \x07 (BEL) is a control char → stripped; \n and \t must survive.
+    { pattern: 'sig', replacement: 'line1\x07\nline2\ttabbed', type: 'macro' },
+  ]);
+
+  assert.equal(result.length, 1);
+  // BEL removed; newline + tab preserved.
+  assert.equal(result[0].replacement, 'line1\nline2\ttabbed');
+  assert.ok(!result[0].replacement.includes('\x07'));
+  assert.deepEqual(JSON.parse(kv.get('voice.dictionary')!), result);
+});
+
 test('getStatsSummary returns zeros on empty/missing key', () => {
   assert.deepEqual(getStatsSummary(fakeKv()), {
     totalWords: 0, recordings: 0, avgWpm: 0, recent: [],
