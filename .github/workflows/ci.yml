@@ -28,16 +28,23 @@ jobs:
         with:
           version: 9
 
-      - name: Setup Node 20
+      # Node 24: needed so `pnpm test` can run the .ts test files directly via
+      # Node's built-in test runner + native TypeScript type-stripping (stable,
+      # unflagged, since Node 23.6). The esbuild bundle still targets Electron's
+      # Node 20 runtime — this is only the toolchain Node for typecheck/test/build.
+      - name: Setup Node 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '24.x'
 
       - name: Install engine (link deps from ./sigmalink; skip native postinstall)
         run: pnpm install --no-frozen-lockfile --ignore-scripts
 
       - name: Typecheck
         run: pnpm typecheck
+
+      - name: Test (node:test — app-shell pure modules)
+        run: pnpm test
 
       - name: Bundle (esbuild — natives external)
         run: pnpm build
