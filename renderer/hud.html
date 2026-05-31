@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SigmaVoice HUD</title>
@@ -194,8 +195,12 @@
     const timerEl = document.getElementById('timer');
 
     // --- elapsed timer (owned entirely by the renderer) ---
+    // The display has 1-second granularity, so a 60fps rAF loop is wasteful.
+    // Poll a few times a second and only touch the DOM when the whole-second
+    // value actually changes (tracked via lastSec).
     let startMs = 0;
-    let rafId = 0;
+    let intervalId = 0;
+    let lastSec = -1;
 
     function fmt(totalSeconds) {
       const s = Math.max(0, Math.floor(totalSeconds));
@@ -205,27 +210,32 @@
     }
 
     function tick() {
-      const elapsed = (performance.now() - startMs) / 1000;
-      timerEl.textContent = fmt(elapsed);
-      rafId = requestAnimationFrame(tick);
+      const sec = Math.max(0, Math.floor((performance.now() - startMs) / 1000));
+      if (sec !== lastSec) {
+        lastSec = sec;
+        timerEl.textContent = fmt(sec);
+      }
     }
 
     function startTimer() {
       stopTimer();
       startMs = performance.now();
+      lastSec = 0;
       timerEl.textContent = '00:00';
-      rafId = requestAnimationFrame(tick);
+      intervalId = setInterval(tick, 250);
     }
 
     function stopTimer() {
-      if (rafId) {
-        cancelAnimationFrame(rafId);
-        rafId = 0;
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = 0;
       }
       // Leave the last value displayed (frozen) — do NOT reset to 00:00.
     }
 
     function applyState(state) {
+      // Un-hide if a prior click-to-dismiss hid the pill locally.
+      pill.style.display = '';
       if (state === 'recording') {
         pill.setAttribute('data-state', 'recording');
         startTimer();
@@ -234,6 +244,23 @@
         stopTimer(); // freeze the elapsed time
       }
     }
+
+    // Click-to-dismiss. The preload bridge is one-way (state in only — "the HUD
+    // never talks back"), so we can't tell main to hide the window without adding
+    // an IPC channel. As a minimal local fallback, hide the pill DOM and stop the
+    // timer; the BrowserWindow stays alive (focusable:false, so clicking it never
+    // steals focus from the user's target app) and a later state event re-shows it.
+    pill.addEventListener('click', () => {
+      stopTimer();
+      pill.style.display = 'none';
+    });
+
+    // When the BrowserWindow is hidden (e.g. recording → idle, which sends no
+    // state event) the renderer's document becomes hidden — stop the interval so
+    // it doesn't keep ticking in a hidden window.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) stopTimer();
+    });
 
     // Wire up the preload bridge if present; otherwise stay on static markup.
     const hud = window.sigmaHud;

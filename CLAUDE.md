@@ -47,13 +47,17 @@ operator authorization.
 
 ## Shared Ruflo memory (single DB across both products)
 
-SigmaLink + SigmaVoice are one production → they **share ONE Ruflo AgentDB**. This repo's
-`.mcp.json` points the ruflo MCP's `CLAUDE_FLOW_DIR` at SigmaLink's store
-(`/Users/aisigma/projects/SigmaLink/.claude-flow`) so patterns/feedback written from either repo
+SigmaLink + SigmaVoice are one production → they **share ONE Ruflo AgentDB**. The ruflo MCP server is
+registered **per machine at local scope** with `CLAUDE_FLOW_DIR` pointed at SigmaLink's store
+(`/Users/aisigma/projects/SigmaLink/app/.claude-flow`) so patterns/feedback written from either repo
 land in the same store and are retrievable from both (`memory_search_unified`).
 
-- `.mcp.json` is **gitignored** (it holds a machine-absolute path). It exists on the operator's
-  machine; **recreate it per machine** pointing `CLAUDE_FLOW_DIR` at the shared SigmaLink `.claude-flow`.
+- **Register per machine** (local scope auto-loads — no approval prompt; a project-scope `.mcp.json`
+  def instead requires a manual `/mcp` approval that's easy to miss → tools silently don't appear).
+  Then **restart Claude Code** so the MCP tools load:
+  `claude mcp add ruflo -s local -e CLAUDE_FLOW_DIR=/Users/aisigma/projects/SigmaLink/app/.claude-flow -- npx -y ruflo@latest mcp start`
+- The local-scope def lives in `~/.claude.json` (per-machine, not committed); `.mcp.json` stays empty.
+  The **daemon is per-repo** (binds to cwd `./.claude-flow`, ignores `CLAUDE_FLOW_DIR`): `ruflo daemon start`.
 - Convention unchanged: **WRITE to namespace `patterns`, READ via `memory_search_unified`**.
 - **Caveat — sequential use only.** Don't run the SigmaLink and SigmaVoice agents *live at the same
   time*: two ruflo daemons on one sql.js store won't see each other's in-session writes until reload

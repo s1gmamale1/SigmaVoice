@@ -42,6 +42,28 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   cross-compile in CI.
 - **Unsigned posture** stands (mac ad-hoc + afterSign codesign; win no Authenticode). Signing needs an ADR.
 
+## 2026-05-31 — Deep-dive analysis → Phase 0 + test harness + security (branch, not yet released)
+- **Analysis.** A 5-dimension adversarially-verified code audit (**69 grounded findings**) + a frame-level
+  **BridgeVoice competitive video teardown** rebuilt `WISHLIST.md` (categorized) + `ROADMAP.md` (canonical
+  7-part phases + ADRs) with a durable evidence base in `docs/03-plan/_research/`. BridgeVoice = BridgeMind's
+  Tauri/Rust, account-gated, cloud-preferring dictation app for vibe-coding; SigmaVoice is the local-first
+  counterpart. Hard non-goals (ADR-gated): accounts, cloud-by-default, sync, telemetry, signing, Linux.
+- **Ruflo wiring (ADR-004).** The ruflo MCP is registered **per machine at LOCAL scope** (`claude mcp add
+  ruflo -s local -e CLAUDE_FLOW_DIR=/Users/aisigma/projects/SigmaLink/app/.claude-flow …`), NOT project
+  `.mcp.json` (which needs a manual `/mcp` approval and silently fails to load). Verified with a `patterns`
+  write→`memory_search_unified` round-trip. The worker daemon is **per-repo** (cwd-bound, ignores
+  `CLAUDE_FLOW_DIR`). Shared store is **sequential-use** (SigmaVoice *or* SigmaLink, not both live).
+- **Phase 0 shipped to branch `feat/phase-0-quick-wins`** (gate-green, spec+quality reviewed): visible tray
+  icon (was `createEmpty`), whisper prewarm (kills first-dictation cold start), boot guard (no silent inert
+  process), honest hotkey validation+toast, dictionary real empty-state, model-download progress+Cancel,
+  HUD 10-min ceiling, and ~8 smaller fixes. Executed via parallel disjoint-file worktree slices → central
+  integrate + gate + review.
+- **CA-1 test harness** (`node --test`, native TS, **zero new deps**, 16 tests; extracted `src/accelerator.ts`;
+  CI on Node 24.x) + **SEC-1/2/4/5** Electron hardening (CSP, nav lockdown, sandbox, dictionary cap).
+- **Descoped:** FE-4 clipboard-only → engine (`RouteOpts` has no output-mode hook). **Pending operator:**
+  merge `feat/phase-0-quick-wins` + real-device smoke (sandbox/CSP/tray/paste can't be verified headless);
+  then Phase 1 UI restyle (design-review), Phase 2 features, Phase 4 engine (W-SV1 Windows CI).
+
 ## Release history
 - **v0.3.2** (2026-05-29, Latest) — fixed the Test-Recording crash (AVAudioEngine tap `format:nil`,
   44.1kHz/2ch mics) + added the model-download UX (list/size/download%/activate). macOS arm64 DMG.

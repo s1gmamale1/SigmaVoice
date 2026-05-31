@@ -16,3 +16,7 @@ release/
 .mcp.json
 .claude-flow/
 .swarm/
+ruvector.db
+
+# Agent worktrees (created by the Workflow tool for isolated parallel slices)
+.claude/worktrees/

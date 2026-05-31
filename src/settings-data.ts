@@ -15,7 +15,20 @@ import type { KvStore } from './kv-store';
 const KV_DICTIONARY = 'voice.dictionary';
 const KV_STATS = 'voice.stats';
 const MAX_PATTERN_LENGTH = 200;
+const MAX_REPLACEMENT_LENGTH = 2000;
 const RECENT_LIMIT = 12;
+
+// Control chars to strip from a replacement string: the C0 controls and DEL,
+// i.e. \x00–\x08, \x0B (VT), \x0C (FF), \x0E–\x1F, \x7F. Newline (\x0A / \n)
+// and tab (\x09 / \t) are deliberately PRESERVED — they're legitimately useful
+// in dictionary expansions (e.g. a macro that inserts a multi-line snippet).
+// Hex escapes (not raw bytes) keep this source clean and reviewable.
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
+
+function stripControlChars(s: string): string {
+  return s.replace(CONTROL_CHARS, '');
+}
 
 export interface DictionaryEntry {
   pattern: string;
@@ -50,15 +63,25 @@ export function getDictionary(kv: KvStore): DictionaryEntry[] {
 }
 
 /**
- * Validate (input boundary) + persist the dictionary. Drops malformed rows and
- * over-long patterns rather than throwing, so a bad row from the UI can't wedge
- * the store. Returns the sanitized list that was written.
+ * Validate (input boundary) + persist the dictionary. Drops malformed rows,
+ * over-long patterns, and over-long replacements rather than throwing, so a bad
+ * row from the UI can't wedge the store. The replacement is also sanitized of
+ * control characters (newline/tab preserved). Returns the list that was written.
  */
 export function setDictionary(kv: KvStore, entries: unknown): DictionaryEntry[] {
   const clean = Array.isArray(entries) ? entries.filter(isDictionaryEntry) : [];
   const sanitized = clean
+    // Pattern bounds (unchanged): non-empty, capped length.
     .filter((e) => e.pattern.length > 0 && e.pattern.length <= MAX_PATTERN_LENGTH)
-    .map((e) => ({ pattern: e.pattern, replacement: e.replacement, type: e.type }));
+    // Replacement bound: drop rows whose replacement exceeds the cap. Matches the
+    // existing over-long-pattern drop behavior (drop, don't truncate).
+    .filter((e) => e.replacement.length <= MAX_REPLACEMENT_LENGTH)
+    .map((e) => ({
+      pattern: e.pattern,
+      // Strip control chars from the replacement (keep \n and \t).
+      replacement: stripControlChars(e.replacement),
+      type: e.type,
+    }));
   kv.set(KV_DICTIONARY, JSON.stringify(sanitized));
   return sanitized;
 }
