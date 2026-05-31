@@ -14,6 +14,35 @@ This ROADMAP is the single source of truth for what to build next.
 
 ---
 
+## Build status — branch `feat/phase-0-quick-wins` (updated 2026-05-31)
+
+Implemented + gate-green (`pnpm typecheck` + `pnpm test` + `pnpm build`), spec+quality reviewed, committed
+to the branch (NOT yet merged/released — pending operator merge + real-device smoke):
+
+- ✅ **Phase 0 — all items** (`7b01f35`): UX-1 tray icon · PF-1 prewarm · CA-3 boot guard · UX-10 hotkey
+  validate+result · UX-5/UX-9/UX-12/UX-15 settings fixes · FE-9 download progress+Cancel · CA-6 HUD ceiling ·
+  PF-4 HUD clock · CA-4/CA-5/UX-11/CA-8.
+- ✅ **Phase 3 partial** — **CA-1** test harness (`e612345`, 16 tests, `node --test` native TS, zero new deps;
+  extracted `src/accelerator.ts`; CI runs `pnpm test` on Node 24.x) · **SEC-1/2/4/5** Electron hardening
+  (`cdbffa8`: CSP, nav lockdown, sandbox, dictionary cap).
+
+**Descoped / deferred (need operator input, hardware, or CI — NOT done unattended):**
+- **FE-4 (clipboard-only)** → engine track (Phase 4): `RouteOpts` has no output-mode hook; needs a `voice-core` change.
+- **Phase 1 (Apple-grade UI/UX restyle)** — UX-2/3/4/6/7/8/13/14/16/19/20/21 + FE-5. **Deferred for design review:**
+  the big restyle (cards/chips, Status dashboard, Overview, HUD redesign, springs) is taste-dependent and best
+  done interactively with the operator (apple-design + visual companion). The objective subset (light mode,
+  keycaps, 44pt, accent) is Playwright-verifiable and can be done first when resumed.
+- **Phase 2 (features)** — floating pill, onboarding, history, mic picker, local cleanup: behavioral/visual,
+  best verified on a real device.
+- **Phase 3 remainder** — CA-2 (split settings.html), SEC-3 (commit lockfile + `--frozen-lockfile`: changes CI
+  install behavior), SEC-6 (clipboard residue), SEC-7 (installer checksum), SEC-8, PF-2/3/5/7.
+- **Phase 4 (engine/native)** — W-SV1 Windows build etc.: needs a Windows CI runner + SigmaLink submodule edits.
+
+⚠️ **Operator smoke needed** before merge: real-device launch to confirm sandbox:true doesn't break the
+preloads and the tray/HUD/hotkey/paste flow works (sandbox + CSP can't be verified headless).
+
+---
+
 ## How to read this
 
 - **Phases are ordered by value/effort**, with cross-phase prerequisites called out.
