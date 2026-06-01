@@ -14,32 +14,30 @@ This ROADMAP is the single source of truth for what to build next.
 
 ---
 
-## Build status — branch `feat/phase-0-quick-wins` (updated 2026-05-31)
+## Build status — `main` (updated 2026-06-01; **13 commits ahead of `origin/main`, unpushed**)
 
-Implemented + gate-green (`pnpm typecheck` + `pnpm test` + `pnpm build`), spec+quality reviewed, committed
-to the branch (NOT yet merged/released — pending operator merge + real-device smoke):
+Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build`), spec+quality reviewed
+(no regressions). **NOT released** — pending operator **push** + **on-device smoke**:
 
-- ✅ **Phase 0 — all items** (`7b01f35`): UX-1 tray icon · PF-1 prewarm · CA-3 boot guard · UX-10 hotkey
+- ✅ **Phase 0 — all items** (merge `9e74a81`): UX-1 tray icon · PF-1 prewarm · CA-3 boot guard · UX-10 hotkey
   validate+result · UX-5/UX-9/UX-12/UX-15 settings fixes · FE-9 download progress+Cancel · CA-6 HUD ceiling ·
   PF-4 HUD clock · CA-4/CA-5/UX-11/CA-8.
-- ✅ **Phase 3 partial** — **CA-1** test harness (`e612345`, 16 tests, `node --test` native TS, zero new deps;
-  extracted `src/accelerator.ts`; CI runs `pnpm test` on Node 24.x) · **SEC-1/2/4/5** Electron hardening
-  (`cdbffa8`: CSP, nav lockdown, sandbox, dictionary cap).
+- ✅ **Phase 1 — all items** (merge `422c8d2`): macOS **sidebar** settings · system **light+dark** + vibrancy
+  (UX-2/3) · cards+chips · **Overview** dashboard + **keycaps** (UX-13/19/FE-5) · 44pt/spacing/springs/accent
+  (UX-4/14/7/16) · **honest HUD** listening animation + error/no-input/done + ARIA (UX-6/8/20) · **CA-2** split
+  (`settings.html` → html+css+9 js modules, all <500) + CSP tightened to `script-src 'self'`.
+- ✅ **Phase 3 partial** — **CA-1** test harness (16+4 tests, `node --test` native TS, zero deps) · **SEC-1/2/4/5**
+  hardening (CSP, nav lockdown, sandbox, dictionary cap) · **CA-2** (done as part of Phase 1).
 
-**Descoped / deferred (need operator input, hardware, or CI — NOT done unattended):**
+**Deferred (need operator input, hardware, or CI):**
 - **FE-4 (clipboard-only)** → engine track (Phase 4): `RouteOpts` has no output-mode hook; needs a `voice-core` change.
-- **Phase 1 (Apple-grade UI/UX restyle)** — UX-2/3/4/6/7/8/13/14/16/19/20/21 + FE-5. **Deferred for design review:**
-  the big restyle (cards/chips, Status dashboard, Overview, HUD redesign, springs) is taste-dependent and best
-  done interactively with the operator (apple-design + visual companion). The objective subset (light mode,
-  keycaps, 44pt, accent) is Playwright-verifiable and can be done first when resumed.
-- **Phase 2 (features)** — floating pill, onboarding, history, mic picker, local cleanup: behavioral/visual,
-  best verified on a real device.
-- **Phase 3 remainder** — CA-2 (split settings.html), SEC-3 (commit lockfile + `--frozen-lockfile`: changes CI
-  install behavior), SEC-6 (clipboard residue), SEC-7 (installer checksum), SEC-8, PF-2/3/5/7.
+- **Phase 2 (features)** — floating pill, onboarding, history, mic picker, local cleanup: behavioral/visual, real-device.
+- **Phase 3 remainder** — SEC-3 (commit lockfile + `--frozen-lockfile`: changes CI install), SEC-6 (clipboard residue),
+  SEC-7 (installer checksum), SEC-8, PF-2/3/5/7.
 - **Phase 4 (engine/native)** — W-SV1 Windows build etc.: needs a Windows CI runner + SigmaLink submodule edits.
 
-⚠️ **Operator smoke needed** before merge: real-device launch to confirm sandbox:true doesn't break the
-preloads and the tray/HUD/hotkey/paste flow works (sandbox + CSP can't be verified headless).
+⚠️ **Before release:** push `main` + an on-device smoke (real macOS vibrancy + tray + that `sandbox:true` doesn't
+break the preloads + the hotkey→paste flow — none verifiable headless).
 
 ---
 
@@ -105,7 +103,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 1 — Apple-grade UI/UX pass — ⬜ PENDING (objective subset Playwright-verifiable; subjective restyle needs operator design review)
+## Phase 1 — Apple-grade UI/UX pass — ✅ DONE (merged to `main` `422c8d2`; pending push + on-device smoke)
 
 **Goal.** The settings window and recording HUD look and behave Cupertino-grade — adaptive appearance, real materials, honest feedback, spring motion, and accessible targets.
 
@@ -154,7 +152,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 3 — Longevity, security & performance hardening — 🟡 PARTIAL (CA-1 + SEC-1/2/4/5 ✅ on `main`; CA-2 · SEC-3/6/7/8 · PF-2/3/5/7 pending)
+## Phase 3 — Longevity, security & performance hardening — 🟡 PARTIAL (CA-1 · CA-2 · SEC-1/2/4/5 ✅ on `main`; SEC-3/6/7/8 · PF-2/3/5/7 pending)
 
 **Goal.** The app-shell is testable, the supply chain is pinned, clipboard privacy residue is handled, and idle resource use is bounded.
 

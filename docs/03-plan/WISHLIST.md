@@ -27,11 +27,12 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
 
 ---
 
-## ✅ Done — merged to `main` `9e74a81` (2026-05-31; pending release + on-device smoke)
+## ✅ Done — merged to `main` (pending push + on-device smoke)
 
-Shipped via `feat/phase-0-quick-wins` (gate-green: `pnpm typecheck`+`pnpm test` 16/16+`pnpm build`; spec+quality reviewed). Marked ✅ inline below.
-- **Phase 0 (all):** UX-1 · UX-5 · UX-9 · UX-10 · UX-11 · UX-12 · UX-15 · FE-9 · CA-3 · CA-4 · CA-5 · CA-6 · CA-8 · PF-1 · PF-4.
-- **Phase 3 (partial):** CA-1 (test harness) · SEC-1 · SEC-2 · SEC-4 · SEC-5.
+Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality reviewed (no regressions). Marked ✅ inline below.
+- **Phase 0 (all)** (merge `9e74a81`, 2026-05-31): UX-1 · UX-5 · UX-9 · UX-10 · UX-11 · UX-12 · UX-15 · FE-9 · CA-3 · CA-4 · CA-5 · CA-6 · CA-8 · PF-1 · PF-4.
+- **Phase 1 (all)** (merge `422c8d2`, 2026-06-01): UX-2 · UX-3 · UX-4 · UX-6 · UX-7 · UX-8 · UX-13 · UX-14 · UX-16 · UX-19 · UX-20 · UX-21 · FE-5 · CA-2 (split + CSP `'self'`).
+- **Phase 3 (partial):** CA-1 (test harness) · CA-2 · SEC-1 · SEC-2 · SEC-4 · SEC-5.
 - **Descoped:** FE-4 → engine track (Phase 4) — `RouteOpts` has no output-mode hook (needs a `voice-core` change).
 - Per the "when an item ships" convention these move to `master_memory.md` + leave this file only once **released**
   (tagged DMG after the on-device smoke). Kept here, marked ✅, until then.
@@ -49,29 +50,29 @@ Shipped via `feat/phase-0-quick-wins` (gate-green: `pnpm typecheck`+`pnpm test` 
   status, KV first-run flag). `medium/L`
 
 ## 🅱 Apple-grade UI/UX (renderer)
-- **UX-2** Light mode / `prefers-color-scheme` (currently dark-only, ignores system appearance). `high/M`
-- **UX-3** Window chrome: `hiddenInset` titlebar + `under-window` vibrancy + min-size (kills the double
+- ✅ **UX-2** Light mode / `prefers-color-scheme` (currently dark-only, ignores system appearance). `high/M`
+- ✅ **UX-3** Window chrome: `hiddenInset` titlebar + `under-window` vibrancy + min-size (kills the double
   titlebar; makes the glass real). `medium/M`
-- **UX-21** Settings restyle → selectable cards + capability chips (BridgeVoice-inspired Local/Cloud cards,
+- ✅ **UX-21** Settings restyle → selectable cards + capability chips (BridgeVoice-inspired Local/Cloud cards,
   model rows, iOS toggles). `medium/M`
-- **UX-13** Status tab → dashboard (active model+ready, hotkey as keycaps, mode, live permission grants).
+- ✅ **UX-13** Status tab → dashboard (active model+ready, hotkey as keycaps, mode, live permission grants).
   `medium/M`
 - ✅ **UX-5** Fix undefined `.status-badge` class → "✓ Active" renders unstyled. `medium/S`
-- **UX-4** 44pt hit targets (toggle/tabs/×/chips). `medium/M`
-- **UX-19** Render hotkey as ⌘⌥⇧⎵ keycaps, not the raw accelerator string. `low/S`
-- **UX-7** Apple spring motion (CSS `linear()` spring on HUD entrance + toggle). `low/S`
-- **UX-14** 8pt spacing/type normalization (11px text floor). `low/M`
-- **UX-16** Accent consistency (systemGreen overloaded: switch-on **and** `routing` badge). `low/S`
+- ✅ **UX-4** 44pt hit targets (toggle/tabs/×/chips). `medium/M`
+- ✅ **UX-19** Render hotkey as ⌘⌥⇧⎵ keycaps, not the raw accelerator string. `low/S`
+- ✅ **UX-7** Apple spring motion (CSS `linear()` spring on HUD entrance + toggle). `low/S`
+- ✅ **UX-14** 8pt spacing/type normalization (11px text floor). `low/M`
+- ✅ **UX-16** Accent consistency (systemGreen overloaded: switch-on **and** `routing` badge). `low/S`
 
 ## 🅲 Recording HUD & floating pill
 - **FE-2** Floating always-visible dictation pill (idle/listening/processing, draggable, click-to-dictate,
   position persisted) — **BridgeVoice signature**; extends the existing focus-preserving HUD. `medium/L`
-- **UX-6** Replace the FAKE equalizer with an honest "listening" animation (app-shell now; real audio level
+- ✅ **UX-6** Replace the FAKE equalizer with an honest "listening" animation (app-shell now; real audio level
   = 🔧 **ENG-5**). `medium/M`
-- **UX-8** HUD states: idle/error/no-input/done (render now; richer triggers need 🔧 engine). `medium/M`
+- ✅ **UX-8** HUD states: idle/error/no-input/done (render now; richer triggers need 🔧 engine). `medium/M`
 - ✅ **CA-6** Recording HUD hard time-ceiling (~10 min) + manual dismiss (currently unbounded → can pin over
   the screen until quit). `medium/S` · bug
-- **UX-20** HUD ARIA live-text matches actual state (currently announces "recording" in idle fallback).
+- ✅ **UX-20** HUD ARIA live-text matches actual state (currently announces "recording" in idle fallback).
   `low/S`
 
 ## 🅳 Features (dictation product)
@@ -79,7 +80,7 @@ Shipped via `feat/phase-0-quick-wins` (gate-green: `pnpm typecheck`+`pnpm test` 
   focus-loss case. `high(daily)/S` ⭐
 - ✅ **FE-9** Model download: determinate progress bar + MB/MB + wire the **already-plumbed** Cancel
   (`abortDownload`). `medium/S` ⭐
-- **FE-5** Usage: add **WPM + Sessions** + an "Overview" dashboard (hero cards + recent activity).
+- ✅ **FE-5** Usage: add **WPM + Sessions** + an "Overview" dashboard (hero cards + recent activity).
   BridgeVoice parity. `medium/S`
 - **FE-6** Searchable transcription history + per-row "Add to Dictionary." `medium/M`
 - ✅ **UX-15** Dictionary: real empty state (stop injecting fake example rows that get saved as real data).
@@ -112,7 +113,7 @@ Shipped via `feat/phase-0-quick-wins` (gate-green: `pnpm typecheck`+`pnpm test` 
   `medium/M`
 - ✅ **CA-3** `whenReady()` try/catch → degraded tray + notification (no silent inert boot). `medium/S` · bug
 - ✅ **UX-10** Hotkey save: validate + honest success/fail toast (today it always toasts "updated"). `medium/S`
-- **CA-2** Split `settings.html` (1390 lines → html + css + JS modules, <500 each). `medium/M`
+- ✅ **CA-2** Split `settings.html` (1390 lines → html + css + JS modules, <500 each). `medium/M`
 - ✅ **CA-8** Fix `pnpm dev` (`electron src/main.ts` can't run raw ESM TS — add `tsx` or build-then-run).
   `low/S` · bug
 - ✅ **CA-4** De-dupe the push-to-talk-degraded notification (two call sites). `low/S` · bug

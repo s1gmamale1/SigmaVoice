@@ -42,6 +42,23 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   cross-compile in CI.
 - **Unsigned posture** stands (mac ad-hoc + afterSign codesign; win no Authenticode). Signing needs an ADR.
 
+## 2026-06-01 — Phase 1: Apple-grade UI/UX (merged to `main`, not yet released)
+- **Shipped to `main`** (merge `422c8d2`, gate-green 20 tests, spec+quality reviewed/no-regressions, Playwright
+  light+dark + 5 HUD states): settings restyled to a **macOS sidebar** app that follows **system light/dark**
+  with real `vibrancy:'sidebar'`+`hiddenInset`; selectable cards+capability chips (Local active / Cloud "soon");
+  an **Overview** dashboard (Words/Sessions/WPM + hotkey as ⌘⌥⎵ keycaps); 44pt targets, `linear()` springs,
+  single-meaning accent. HUD: the **fake equalizer is gone** → honest breathing "listening" wave + error/no-input/
+  done states + ARIA. **CA-2** done: `settings.html` (1390) split → `settings.html`+`settings.css`+9 `js/*` ES
+  modules (all <500); CSP tightened to `script-src 'self'`. New pure `src/keycaps.ts` (`formatAccelerator`, tested).
+- **Process learning (recorded in Ruflo `patterns`):** the Workflow tool's `isolation:'worktree'` branches from a
+  **stale base** (session-start commit), not current HEAD — its first Phase-1 pass edited pre-Phase-0 files and
+  would have reverted Phase 0. Caught before integration; **redid on the correct base via a single main-tree agent**
+  (full gate+Playwright), using the stale worktree outputs only as design reference. For work that builds on
+  committed changes, prefer a single/sequential main-tree agent over parallel worktree slices, or verify the
+  worktree base first.
+- **State:** `main` is ahead of `origin` (unpushed, operator can't push yet). Still pending: **push** + an
+  **on-device smoke** (vibrancy/tray/sandbox/paste — not headless-verifiable) before any release/tag.
+
 ## 2026-05-31 — Deep-dive analysis → Phase 0 + test harness + security (branch, not yet released)
 - **Analysis.** A 5-dimension adversarially-verified code audit (**69 grounded findings**) + a frame-level
   **BridgeVoice competitive video teardown** rebuilt `WISHLIST.md` (categorized) + `ROADMAP.md` (canonical
