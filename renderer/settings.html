@@ -1,933 +1,301 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src 'self'" />
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'" />
   <title>SigmaVoice Settings</title>
-  <style>
-    /* ── Reset ────────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :focus-visible {
-      outline: 2px solid var(--accent);
-      outline-offset: 2px;
-      border-radius: 4px;
-    }
-
-    /* ── Design tokens ───────────────────────────────────────── */
-    :root {
-      /* Color — dark-mode system palette */
-      --bg:              #111114;
-      --surface:         rgba(28, 28, 30, 0.82);
-      --surface-opaque:  #1c1c1e;
-      --surface-raised:  rgba(44, 44, 46, 0.72);
-      --surface-raised-opaque: #2c2c2e;
-      --divider:         rgba(255, 255, 255, 0.08);
-      --accent:          #0a84ff;
-      --accent-dim:      rgba(10, 132, 255, 0.18);
-      --accent-pressed:  #0070d8;
-      --red:             #ff453a;
-      --orange:          #ff9f0a;
-      --green:           #30d158;
-      --label-primary:   rgba(255, 255, 255, 0.92);
-      --label-secondary: rgba(255, 255, 255, 0.55);
-      --label-tertiary:  rgba(255, 255, 255, 0.30);
-      --label-disabled:  rgba(255, 255, 255, 0.20);
-      --fill-primary:    rgba(255, 255, 255, 0.10);
-      --fill-secondary:  rgba(255, 255, 255, 0.06);
-      --fill-tertiary:   rgba(255, 255, 255, 0.04);
-
-      /* Typography — SF Pro stack */
-      --font: -apple-system, "SF Pro Text", "SF Pro Display",
-              "Helvetica Neue", Arial, sans-serif;
-      --font-mono: "SF Mono", "Menlo", "Monaco", "Courier New", monospace;
-
-      /* Radius */
-      --r-xs: 4px;
-      --r-sm: 6px;
-      --r-md: 10px;
-      --r-lg: 14px;
-      --r-xl: 18px;
-
-      /* Motion */
-      --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
-      --dur-fast: 140ms;
-      --dur-mid:  220ms;
-    }
-
-    /* Reduced-transparency: swap glass for opaque surfaces */
-    @media (prefers-reduced-transparency: reduce) {
-      :root {
-        --surface:        var(--surface-opaque);
-        --surface-raised: var(--surface-raised-opaque);
-        --bg:             #0d0d0f;
-      }
-    }
-
-    /* Reduced-motion: kill all transitions/animations */
-    @media (prefers-reduced-motion: reduce) {
-      *, *::before, *::after {
-        transition-duration: 0.001ms !important;
-        animation-duration:  0.001ms !important;
-      }
-    }
-
-    /* ── Root layout ─────────────────────────────────────────── */
-    html, body {
-      height: 100%;
-      width:  100%;
-      overflow: hidden;
-    }
-
-    body {
-      font-family:      var(--font);
-      font-size:        13px;
-      line-height:      1.45;
-      color:            var(--label-primary);
-      background:       var(--bg);
-      display:          flex;
-      flex-direction:   column;
-      -webkit-font-smoothing:  antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-
-    /* ── Chrome / title-bar drag region ─────────────────────── */
-    .titlebar {
-      height:           38px;
-      min-height:       38px;
-      display:          flex;
-      align-items:      center;
-      justify-content:  center;
-      -webkit-app-region: drag;
-      position:         relative;
-      flex-shrink:      0;
-    }
-
-    .titlebar-title {
-      font-size:    13px;
-      font-weight:  600;
-      letter-spacing: -0.01em;
-      color:        var(--label-secondary);
-      user-select:  none;
-    }
-
-    /* ── Tab nav ─────────────────────────────────────────────── */
-    .nav {
-      display:        flex;
-      align-items:    center;
-      gap:            2px;
-      padding:        0 12px 8px;
-      flex-shrink:    0;
-      -webkit-app-region: no-drag;
-    }
-
-    .nav-tab {
-      flex:           1;
-      padding:        5px 4px;
-      border:         none;
-      border-radius:  var(--r-sm);
-      background:     transparent;
-      color:          var(--label-secondary);
-      font-family:    var(--font);
-      font-size:      11px;
-      font-weight:    500;
-      letter-spacing: 0.01em;
-      cursor:         pointer;
-      text-align:     center;
-      transition:     background var(--dur-fast) var(--ease-out),
-                      color     var(--dur-fast) var(--ease-out);
-      -webkit-app-region: no-drag;
-    }
-
-    .nav-tab:hover {
-      background: var(--fill-primary);
-      color:      var(--label-primary);
-    }
-
-    .nav-tab[aria-selected="true"] {
-      background: var(--fill-secondary);
-      color:      var(--accent);
-      font-weight: 600;
-    }
-
-    /* ── Main scroll area ────────────────────────────────────── */
-    .main {
-      flex:       1;
-      overflow-y: auto;
-      padding:    0 12px 12px;
-      -webkit-app-region: no-drag;
-    }
-
-    .main::-webkit-scrollbar { width: 0; }
-
-    /* ── Panels (tab content) ────────────────────────────────── */
-    .panel { display: none; }
-    .panel.active { display: block; }
-
-    /* ── Card ────────────────────────────────────────────────── */
-    .card {
-      background:     var(--surface);
-      backdrop-filter: blur(20px) saturate(180%);
-      -webkit-backdrop-filter: blur(20px) saturate(180%);
-      border-radius:  var(--r-lg);
-      border:         1px solid var(--divider);
-      overflow:       hidden;
-      margin-bottom:  10px;
-    }
-
-    /* ── Row ─────────────────────────────────────────────────── */
-    .row {
-      display:          flex;
-      align-items:      center;
-      justify-content:  space-between;
-      gap:              12px;
-      min-height:       42px;
-      padding:          8px 14px;
-    }
-
-    .row + .row {
-      border-top: 1px solid var(--divider);
-    }
-
-    .row-label {
-      font-size:   13px;
-      font-weight: 400;
-      color:       var(--label-primary);
-      flex:        1;
-      min-width:   0;
-    }
-
-    .row-sublabel {
-      font-size:   11px;
-      color:       var(--label-secondary);
-      margin-top:  1px;
-    }
-
-    /* ── Section header ──────────────────────────────────────── */
-    .section-header {
-      font-size:      11px;
-      font-weight:    600;
-      letter-spacing: 0.04em;
-      color:          var(--label-tertiary);
-      text-transform: uppercase;
-      padding:        14px 4px 4px;
-      margin-bottom:  2px;
-    }
-
-    /* ── Status badge ────────────────────────────────────────── */
-    .state-badge {
-      display:       inline-flex;
-      align-items:   center;
-      gap:           5px;
-      padding:       3px 10px 3px 8px;
-      border-radius: 100px;
-      font-size:     11px;
-      font-weight:   600;
-      letter-spacing: 0.01em;
-      transition:    background var(--dur-mid) var(--ease-out),
-                     color     var(--dur-mid) var(--ease-out);
-    }
-
-    .state-dot {
-      width:         6px;
-      height:        6px;
-      border-radius: 50%;
-      flex-shrink:   0;
-    }
-
-    .state-badge.idle        { background: var(--fill-secondary); color: var(--label-secondary); }
-    .state-badge.idle        .state-dot { background: var(--label-tertiary); }
-    .state-badge.recording   { background: rgba(255, 69, 58, 0.18);  color: var(--red); }
-    .state-badge.recording   .state-dot { background: var(--red); animation: pulse-dot 1.2s ease-in-out infinite; }
-    .state-badge.transcribing{ background: rgba(255, 159, 10, 0.18); color: var(--orange); }
-    .state-badge.transcribing .state-dot { background: var(--orange); }
-    .state-badge.routing     { background: rgba(48, 209, 88, 0.18);  color: var(--green); }
-    .state-badge.routing     .state-dot { background: var(--green); }
-
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.5; transform: scale(0.75); }
-    }
-
-    /* ── Toggle switch ───────────────────────────────────────── */
-    .toggle-wrap {
-      display:    flex;
-      align-items: center;
-      gap:        8px;
-    }
-
-    .toggle {
-      position:   relative;
-      width:      40px;
-      height:     24px;
-      flex-shrink: 0;
-    }
-
-    .toggle input {
-      opacity:   0;
-      width:     0;
-      height:    0;
-      position:  absolute;
-    }
-
-    .toggle-track {
-      position:         absolute;
-      inset:            0;
-      border-radius:    100px;
-      background:       rgba(255, 255, 255, 0.12);
-      transition:       background var(--dur-fast) var(--ease-out);
-      cursor:           pointer;
-    }
-
-    .toggle input:checked + .toggle-track {
-      background: var(--green);
-    }
-
-    .toggle-track::after {
-      content:          '';
-      position:         absolute;
-      top:              2px;
-      left:             2px;
-      width:            20px;
-      height:           20px;
-      border-radius:    50%;
-      background:       #fff;
-      box-shadow:       0 1px 3px rgba(0,0,0,0.4);
-      transition:       transform var(--dur-fast) var(--ease-out);
-    }
-
-    .toggle input:checked + .toggle-track::after {
-      transform: translateX(16px);
-    }
-
-    .toggle input:focus-visible + .toggle-track {
-      outline:        2px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    /* ── Segmented control ───────────────────────────────────── */
-    .seg-control {
-      display:        flex;
-      background:     var(--fill-secondary);
-      border-radius:  var(--r-sm);
-      padding:        2px;
-      gap:            0;
-      border:         1px solid var(--divider);
-    }
-
-    .seg-btn {
-      flex:           1;
-      padding:        4px 10px;
-      border:         none;
-      border-radius:  calc(var(--r-sm) - 2px);
-      background:     transparent;
-      color:          var(--label-secondary);
-      font-family:    var(--font);
-      font-size:      12px;
-      font-weight:    500;
-      cursor:         pointer;
-      transition:     background var(--dur-fast) var(--ease-out),
-                      color     var(--dur-fast) var(--ease-out);
-      white-space:    nowrap;
-    }
-
-    .seg-btn:hover:not([aria-pressed="true"]) {
-      color: var(--label-primary);
-    }
-
-    .seg-btn[aria-pressed="true"] {
-      background: var(--fill-primary);
-      color:      var(--label-primary);
-      font-weight: 600;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
-    }
-
-    /* ── Input ────────────────────────────────────────────────── */
-    .input-field {
-      background:     var(--fill-secondary);
-      border:         1px solid var(--divider);
-      border-radius:  var(--r-sm);
-      color:          var(--label-primary);
-      font-family:    var(--font-mono);
-      font-size:      12px;
-      padding:        5px 8px;
-      width:          190px;
-      transition:     border-color var(--dur-fast) var(--ease-out),
-                      background   var(--dur-fast) var(--ease-out);
-      outline:        none;
-    }
-
-    .input-field:focus {
-      border-color: var(--accent);
-      background:   rgba(10, 132, 255, 0.06);
-    }
-
-    .input-field::placeholder { color: var(--label-disabled); }
-
-    /* ── Select ────────────────────────────────────────────────── */
-    .select-field {
-      background:     var(--fill-secondary);
-      border:         1px solid var(--divider);
-      border-radius:  var(--r-sm);
-      color:          var(--label-primary);
-      font-family:    var(--font);
-      font-size:      12px;
-      padding:        5px 24px 5px 8px;
-      width:          190px;
-      appearance:     none;
-      -webkit-appearance: none;
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-      background-repeat:   no-repeat;
-      background-position: right 8px center;
-      cursor:         pointer;
-      outline:        none;
-    }
-
-    .select-field:focus {
-      border-color: var(--accent);
-    }
-
-    option {
-      background: var(--surface-opaque);
-      color:      var(--label-primary);
-    }
-
-    /* ── Buttons ─────────────────────────────────────────────── */
-    .btn {
-      padding:        6px 14px;
-      border-radius:  var(--r-sm);
-      border:         none;
-      font-family:    var(--font);
-      font-size:      12px;
-      font-weight:    500;
-      cursor:         pointer;
-      transition:     background var(--dur-fast) var(--ease-out),
-                      transform  0.08s var(--ease-out),
-                      opacity    var(--dur-fast) var(--ease-out);
-      white-space:    nowrap;
-    }
-
-    .btn:active { transform: scale(0.97); }
-
-    .btn-secondary {
-      background: var(--fill-primary);
-      color:      var(--label-primary);
-      border:     1px solid var(--divider);
-    }
-    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
-
-    .btn-primary {
-      background: var(--accent);
-      color:      #fff;
-    }
-    .btn-primary:hover { background: var(--accent-pressed); }
-
-    .btn-danger {
-      background: rgba(255, 69, 58, 0.18);
-      color:      var(--red);
-      border:     1px solid rgba(255, 69, 58, 0.25);
-    }
-    .btn-danger:hover { background: rgba(255, 69, 58, 0.28); }
-
-    .btn-ghost {
-      background: transparent;
-      color:      var(--accent);
-      padding:    4px 0;
-    }
-    .btn-ghost:hover { opacity: 0.75; }
-
-    .btn:disabled {
-      opacity: 0.38;
-      cursor:  not-allowed;
-    }
-    .btn:disabled:active { transform: none; }
-
-    /* ── Download progress bar ───────────────────────────────── */
-    .dl-progress {
-      width:         100%;
-      height:        4px;
-      border-radius: 100px;
-      background:    var(--fill-secondary);
-      overflow:      hidden;
-      margin-top:    6px;
-    }
-    .dl-progress-fill {
-      height:        100%;
-      width:         0%;
-      border-radius: 100px;
-      background:    var(--accent);
-      transition:    width var(--dur-mid) var(--ease-out);
-    }
-
-    /* ── Record button (big) ─────────────────────────────────── */
-    .record-btn-wrap {
-      display:         flex;
-      justify-content: center;
-      padding:         6px 14px 10px;
-    }
-
-    .record-btn {
-      display:         flex;
-      align-items:     center;
-      gap:             7px;
-      padding:         9px 20px;
-      border-radius:   100px;
-      border:          none;
-      font-family:     var(--font);
-      font-size:       13px;
-      font-weight:     600;
-      cursor:          pointer;
-      transition:      background var(--dur-fast) var(--ease-out),
-                       transform  0.08s var(--ease-out);
-    }
-
-    .record-btn:active { transform: scale(0.97); }
-
-    .record-btn.idle {
-      background: var(--red);
-      color:      #fff;
-      box-shadow: 0 2px 12px rgba(255, 69, 58, 0.35);
-    }
-    .record-btn.idle:hover {
-      background: #e83a31;
-    }
-
-    .record-btn.recording {
-      background: rgba(255, 69, 58, 0.18);
-      color:      var(--red);
-      border:     1.5px solid rgba(255, 69, 58, 0.4);
-      box-shadow: none;
-    }
-
-    .record-icon {
-      width:  10px;
-      height: 10px;
-      border-radius: 50%;
-      background:    currentColor;
-      flex-shrink:   0;
-    }
-
-    .record-btn.recording .record-icon {
-      border-radius: 2px;
-    }
-
-    /* ── Dictionary table ────────────────────────────────────── */
-    .dict-table {
-      width:           100%;
-      border-collapse: collapse;
-      font-size:       12px;
-    }
-
-    .dict-table thead th {
-      padding:         6px 10px;
-      text-align:      left;
-      font-size:       10px;
-      font-weight:     600;
-      letter-spacing:  0.05em;
-      text-transform:  uppercase;
-      color:           var(--label-tertiary);
-      border-bottom:   1px solid var(--divider);
-    }
-
-    .dict-table tbody tr {
-      border-bottom: 1px solid var(--divider);
-    }
-    .dict-table tbody tr:last-child { border-bottom: none; }
-
-    .dict-table tbody tr:hover td {
-      background: var(--fill-tertiary);
-    }
-
-    .dict-table td {
-      padding: 6px 8px;
-      vertical-align: middle;
-    }
-
-    .dict-input {
-      background:   transparent;
-      border:       1px solid transparent;
-      border-radius: var(--r-xs);
-      color:        var(--label-primary);
-      font-family:  var(--font);
-      font-size:    12px;
-      padding:      3px 6px;
-      width:        100%;
-      outline:      none;
-      transition:   border-color var(--dur-fast) var(--ease-out),
-                    background   var(--dur-fast) var(--ease-out);
-    }
-
-    .dict-input:focus {
-      border-color: var(--accent);
-      background:   rgba(10, 132, 255, 0.06);
-    }
-
-    .dict-input-replacement {
-      font-family: var(--font-mono);
-      font-size:   11.5px;
-    }
-
-    .type-chip {
-      display:       inline-flex;
-      align-items:   center;
-      padding:       2px 7px;
-      border-radius: 100px;
-      font-size:     10px;
-      font-weight:   600;
-      letter-spacing: 0.03em;
-      cursor:        pointer;
-      user-select:   none;
-      border:        none;
-      transition:    background var(--dur-fast) var(--ease-out),
-                     color     var(--dur-fast) var(--ease-out);
-    }
-
-    .type-chip.phrase {
-      background: rgba(10, 132, 255, 0.18);
-      color:      var(--accent);
-    }
-    .type-chip.macro {
-      background: rgba(255, 159, 10, 0.18);
-      color:      var(--orange);
-    }
-
-    .dict-remove-btn {
-      background:  transparent;
-      border:      none;
-      color:       var(--label-tertiary);
-      cursor:      pointer;
-      padding:     2px 4px;
-      border-radius: var(--r-xs);
-      font-size:   14px;
-      line-height: 1;
-      transition:  color var(--dur-fast) var(--ease-out);
-    }
-    .dict-remove-btn:hover { color: var(--red); }
-
-    .dict-footer {
-      display:    flex;
-      align-items: center;
-      justify-content: space-between;
-      padding:    8px 14px;
-      border-top: 1px solid var(--divider);
-    }
-
-    /* ── Stats panel ─────────────────────────────────────────── */
-    .stats-grid {
-      display:               grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap:                   1px;
-      background:            var(--divider);
-      border-radius:         var(--r-lg);
-      overflow:              hidden;
-    }
-
-    .stat-cell {
-      background:  var(--surface);
-      padding:     14px 12px 12px;
-      text-align:  center;
-    }
-
-    .stat-value {
-      font-size:    26px;
-      font-weight:  700;
-      letter-spacing: -0.03em;
-      color:        var(--label-primary);
-      line-height:  1;
-    }
-
-    .stat-label {
-      font-size:    10px;
-      font-weight:  500;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      color:        var(--label-tertiary);
-      margin-top:   4px;
-    }
-
-    .recent-row {
-      display:          flex;
-      align-items:      center;
-      justify-content:  space-between;
-      gap:              8px;
-    }
-
-    .recent-row + .recent-row {
-      border-top: 1px solid var(--divider);
-    }
-
-    .recent-time {
-      font-size:  11px;
-      color:      var(--label-tertiary);
-      font-variant-numeric: tabular-nums;
-      min-width:  80px;
-    }
-
-    .recent-words {
-      font-size:   12px;
-      color:       var(--label-secondary);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .recent-wpm {
-      font-size:   12px;
-      color:       var(--accent);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-      min-width:   48px;
-      text-align:  right;
-    }
-
-    .stats-empty {
-      padding:    20px 14px;
-      text-align: center;
-      color:      var(--label-tertiary);
-      font-size:  12px;
-    }
-
-    /* ── Toast ────────────────────────────────────────────────── */
-    .toast {
-      position:      fixed;
-      bottom:        12px;
-      left:          12px;
-      right:         12px;
-      background:    rgba(44, 44, 46, 0.95);
-      backdrop-filter: blur(20px) saturate(160%);
-      -webkit-backdrop-filter: blur(20px) saturate(160%);
-      border-radius: var(--r-md);
-      border:        1px solid var(--divider);
-      padding:       9px 12px;
-      font-size:     12px;
-      display:       flex;
-      align-items:   center;
-      gap:           8px;
-      opacity:       0;
-      transform:     translateY(6px);
-      pointer-events: none;
-      transition:    opacity  var(--dur-mid) var(--ease-out),
-                     transform var(--dur-mid) var(--ease-out);
-      z-index:       100;
-    }
-
-    .toast.visible {
-      opacity:   1;
-      transform: translateY(0);
-    }
-
-    .toast-dot {
-      width:         6px;
-      height:        6px;
-      border-radius: 50%;
-      flex-shrink:   0;
-    }
-
-    .toast.info  .toast-dot { background: var(--accent); }
-    .toast.warn  .toast-dot { background: var(--orange); }
-    .toast.error .toast-dot { background: var(--red); }
-
-    .toast-text {
-      flex:       1;
-      color:      var(--label-primary);
-      min-width:  0;
-    }
-
-    /* ── Unavailable notice ──────────────────────────────────── */
-    .unavailable-notice {
-      display:        flex;
-      flex-direction: column;
-      align-items:    center;
-      justify-content: center;
-      height:         100%;
-      gap:            8px;
-      color:          var(--label-tertiary);
-      font-size:      12px;
-      text-align:     center;
-      padding:        24px;
-    }
-
-    .unavailable-notice strong {
-      color:      var(--label-secondary);
-      font-size:  13px;
-    }
-
-    /* ── Utility ─────────────────────────────────────────────── */
-    .flex-end { justify-content: flex-end; }
-    .row-gap  { gap: 8px; }
-  </style>
+  <link rel="stylesheet" href="./settings.css" />
 </head>
 <body>
 
-  <!-- Title bar -->
-  <div class="titlebar" role="banner">
-    <span class="titlebar-title">SigmaVoice</span>
-  </div>
+  <!-- macOS sidebar layout: left rail + content pane -->
+  <div class="shell">
 
-  <!-- Tab navigation -->
-  <nav class="nav" role="tablist" aria-label="Settings sections">
-    <button class="nav-tab" role="tab" aria-selected="true"  aria-controls="panel-status"     id="tab-status"     data-panel="status">Status</button>
-    <button class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-capture"    id="tab-capture"    data-panel="capture">Capture</button>
-    <button class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-dictionary" id="tab-dictionary" data-panel="dictionary">Dictionary</button>
-    <button class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-usage"      id="tab-usage"      data-panel="usage">Usage</button>
-    <button class="nav-tab" role="tab" aria-selected="false" aria-controls="panel-test"       id="tab-test"       data-panel="test">Test</button>
-  </nav>
+    <!-- ── Left rail ─────────────────────────────────────────── -->
+    <nav class="rail" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+      <!-- Drag region (hiddenInset traffic lights sit here) -->
+      <div class="rail-header" role="banner">
+        <span class="rail-title">SigmaVoice</span>
+      </div>
 
-  <!-- Scroll container -->
-  <main class="main" role="main">
+      <button class="rail-item" role="tab" aria-selected="true" aria-current="page"
+              aria-controls="pane-overview" id="rail-overview" data-panel="overview" tabindex="0">
+        <span class="rail-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none">
+            <rect x="2.5" y="3" width="7" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="2.5" y="13" width="7" height="4.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="11.5" y="3" width="6" height="4.5" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+            <rect x="11.5" y="10" width="6" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+          </svg>
+        </span>
+        <span class="rail-label">Overview</span>
+      </button>
 
-    <!-- ── Panel: Status ──────────────────────────────────── -->
-    <div class="panel active" id="panel-status" role="tabpanel" aria-labelledby="tab-status">
+      <button class="rail-item" role="tab" aria-selected="false"
+              aria-controls="pane-capture" id="rail-capture" data-panel="capture" tabindex="-1">
+        <span class="rail-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none">
+            <rect x="7" y="2.5" width="6" height="10" rx="3" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M4.5 9.5a5.5 5.5 0 0 0 11 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M10 15v2.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="rail-label">Capture</span>
+      </button>
 
-      <p class="section-header">Voice capture</p>
-      <div class="card">
-        <div class="row">
-          <div>
+      <button class="rail-item" role="tab" aria-selected="false"
+              aria-controls="pane-dictionary" id="rail-dictionary" data-panel="dictionary" tabindex="-1">
+        <span class="rail-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none">
+            <path d="M4 3.5h9a2 2 0 0 1 2 2v11a1.5 1.5 0 0 0-1.5-1.5H4z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+            <path d="M4 3.5a1.5 1.5 0 0 0-1.5 1.5v11A1.5 1.5 0 0 0 4 17.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6.5 7.5h6M6.5 10.5h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </span>
+        <span class="rail-label">Dictionary</span>
+      </button>
+
+      <button class="rail-item" role="tab" aria-selected="false"
+              aria-controls="pane-usage" id="rail-usage" data-panel="usage" tabindex="-1">
+        <span class="rail-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none">
+            <path d="M3 17V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <path d="M3 17h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            <rect x="5.5" y="10" width="2.6" height="4.5" rx="0.8" fill="currentColor"/>
+            <rect x="9.5" y="7" width="2.6" height="7.5" rx="0.8" fill="currentColor"/>
+            <rect x="13.5" y="4.5" width="2.6" height="10" rx="0.8" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="rail-label">Usage</span>
+      </button>
+
+      <button class="rail-item" role="tab" aria-selected="false"
+              aria-controls="pane-test" id="rail-test" data-panel="test" tabindex="-1">
+        <span class="rail-icon" aria-hidden="true">
+          <svg viewBox="0 0 20 20" width="18" height="18" fill="none">
+            <circle cx="10" cy="10" r="7.25" stroke="currentColor" stroke-width="1.5"/>
+            <circle cx="10" cy="10" r="2.5" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="rail-label">Test</span>
+      </button>
+    </nav>
+
+    <!-- ── Content pane ──────────────────────────────────────── -->
+    <main class="content" role="main">
+
+      <!-- ── Pane: Overview ──────────────────────────────────── -->
+      <section class="pane active" id="pane-overview" role="tabpanel" aria-labelledby="rail-overview">
+
+        <div class="hero-grid" aria-label="Usage summary">
+          <div class="hero-card">
+            <div class="hero-value" id="hero-words">—</div>
+            <div class="hero-label">Words</div>
+          </div>
+          <div class="hero-card">
+            <div class="hero-value" id="hero-sessions">—</div>
+            <div class="hero-label">Sessions</div>
+          </div>
+          <div class="hero-card">
+            <div class="hero-value" id="hero-wpm">—</div>
+            <div class="hero-label">Avg WPM</div>
+          </div>
+        </div>
+
+        <p class="section-header">Status</p>
+        <div class="card">
+          <div class="row">
             <div class="row-label">State</div>
+            <span id="state-badge" class="state-badge idle" aria-live="polite" aria-atomic="true">
+              <span class="state-dot" aria-hidden="true"></span>
+              <span id="state-text">idle</span>
+            </span>
           </div>
-          <span id="state-badge" class="state-badge idle" aria-live="polite" aria-atomic="true">
-            <span class="state-dot" aria-hidden="true"></span>
-            <span id="state-text">idle</span>
-          </span>
-        </div>
-        <div class="row">
-          <div>
-            <div class="row-label">Enable SigmaVoice</div>
-            <div class="row-sublabel">Activates global hotkey capture</div>
+          <div class="row">
+            <div>
+              <div class="row-label">Enable SigmaVoice</div>
+              <div class="row-sublabel">Activates global hotkey capture</div>
+            </div>
+            <label class="toggle" aria-label="Enable SigmaVoice">
+              <input type="checkbox" id="enabled-toggle" role="switch" aria-checked="false" />
+              <span class="toggle-track"></span>
+            </label>
           </div>
-          <label class="toggle" aria-label="Enable SigmaVoice">
-            <input type="checkbox" id="enabled-toggle" role="switch" aria-checked="false" />
-            <span class="toggle-track"></span>
-          </label>
-        </div>
-      </div>
-
-    </div>
-
-    <!-- ── Panel: Capture ─────────────────────────────────── -->
-    <div class="panel" id="panel-capture" role="tabpanel" aria-labelledby="tab-capture">
-
-      <p class="section-header">Hotkey</p>
-      <div class="card">
-        <div class="row">
-          <div class="row-label">Global shortcut</div>
-          <input id="hotkey-input" class="input-field" type="text"
-                 placeholder="CommandOrControl+Alt+Space"
-                 aria-label="Global hotkey shortcut" />
-        </div>
-        <div class="row flex-end">
-          <button id="hotkey-save-btn" class="btn btn-primary">Apply</button>
-        </div>
-      </div>
-
-      <p class="section-header">Mode</p>
-      <div class="card">
-        <div class="row">
-          <div>
-            <div class="row-label">Capture mode</div>
-            <div class="row-sublabel" id="mode-sublabel">Tap hotkey to start/stop</div>
+          <div class="row">
+            <div class="row-label">Active model</div>
+            <span class="row-value" id="overview-model">—</span>
           </div>
-          <div class="seg-control" role="group" aria-label="Capture mode">
-            <button class="seg-btn" id="mode-toggle-btn" aria-pressed="true"  data-mode="toggle">Toggle</button>
-            <button class="seg-btn" id="mode-ptt-btn"    aria-pressed="false" data-mode="push-to-talk">Push-to-talk</button>
+          <div class="row">
+            <div class="row-label">Hotkey</div>
+            <span class="kbd-row" id="overview-hotkey" aria-label="Current hotkey"></span>
           </div>
         </div>
-      </div>
 
-      <p class="section-header">Model</p>
-      <div class="card">
-        <div class="row" style="border-bottom:none; padding-bottom:4px;">
-          <div>
-            <div class="row-label">Whisper model</div>
-            <div class="row-sublabel">Runs fully local — download one to transcribe. Until then, macOS Speech is used.</div>
+        <p class="section-header">Recent activity</p>
+        <div class="card" id="overview-recent">
+          <div class="stats-empty" id="overview-recent-empty">No recordings yet</div>
+        </div>
+
+      </section>
+
+      <!-- ── Pane: Capture ───────────────────────────────────── -->
+      <section class="pane" id="pane-capture" role="tabpanel" aria-labelledby="rail-capture">
+
+        <p class="section-header">Transcription mode</p>
+        <div class="mode-cards" role="group" aria-label="Transcription engine">
+          <div class="mode-card selected" aria-current="true">
+            <div class="mode-card-head">
+              <span class="mode-card-title">Local</span>
+              <span class="mode-card-check" aria-hidden="true">✓</span>
+            </div>
+            <p class="mode-card-desc">On-device Whisper. No audio leaves your Mac.</p>
+            <div class="chip-row">
+              <span class="chip">Private</span>
+              <span class="chip">Offline</span>
+              <span class="chip">English</span>
+            </div>
           </div>
-          <button id="model-refresh-btn" class="btn btn-ghost" aria-label="Refresh model list">Refresh</button>
-        </div>
-        <div id="model-list" aria-live="polite"><!-- injected by JS --></div>
-      </div>
-
-    </div>
-
-    <!-- ── Panel: Dictionary ──────────────────────────────── -->
-    <div class="panel" id="panel-dictionary" role="tabpanel" aria-labelledby="tab-dictionary">
-
-      <p class="section-header">Phrases &amp; macros</p>
-      <div class="card">
-        <table class="dict-table" aria-label="Dictionary entries">
-          <thead>
-            <tr>
-              <th scope="col">Spoken phrase</th>
-              <th scope="col">Replacement</th>
-              <th scope="col">Type</th>
-              <th scope="col" style="width:28px"><span class="sr-only">Remove</span></th>
-            </tr>
-          </thead>
-          <tbody id="dict-body">
-            <!-- rows injected by JS -->
-          </tbody>
-        </table>
-        <div class="dict-footer">
-          <button id="dict-add-btn" class="btn btn-ghost">+ Add entry</button>
-          <button id="dict-save-btn" class="btn btn-primary">Save</button>
-        </div>
-      </div>
-
-      <p class="section-header" style="color: var(--label-disabled); font-size:10px; padding-top:4px;">
-        Tip — macros can contain special characters, e.g. "new line" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">\n</code>, "open brace" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">{</code>, "close brace" → <code style="font-family:var(--font-mono); color:var(--label-tertiary);">}</code>. Phrases rewrite spoken words, e.g. "sigma link" → SigmaLink.
-      </p>
-
-    </div>
-
-    <!-- ── Panel: Usage ───────────────────────────────────── -->
-    <div class="panel" id="panel-usage" role="tabpanel" aria-labelledby="tab-usage">
-
-      <p class="section-header">All time</p>
-      <div class="stats-grid" id="stats-grid" aria-label="Usage statistics">
-        <div class="stat-cell">
-          <div class="stat-value" id="stat-words">—</div>
-          <div class="stat-label">Words</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-value" id="stat-recordings">—</div>
-          <div class="stat-label">Sessions</div>
-        </div>
-        <div class="stat-cell">
-          <div class="stat-value" id="stat-wpm">—</div>
-          <div class="stat-label">Avg WPM</div>
-        </div>
-      </div>
-
-      <p class="section-header">Recent activity</p>
-      <div class="card" id="recent-card">
-        <div class="stats-empty" id="recent-empty">No recordings yet</div>
-      </div>
-
-      <div style="display:flex; justify-content:flex-end; padding: 4px 0 8px;">
-        <button id="stats-refresh-btn" class="btn btn-secondary" aria-label="Refresh usage stats">Refresh</button>
-      </div>
-
-    </div>
-
-    <!-- ── Panel: Test ────────────────────────────────────── -->
-    <div class="panel" id="panel-test" role="tabpanel" aria-labelledby="tab-test">
-
-      <p class="section-header">Manual trigger</p>
-      <div class="card">
-        <div class="row">
-          <div>
-            <div class="row-label">Test transcription</div>
-            <div class="row-sublabel">Record a clip and transcribe immediately</div>
+          <div class="mode-card disabled" aria-disabled="true">
+            <div class="mode-card-head">
+              <span class="mode-card-title">Cloud</span>
+            </div>
+            <p class="mode-card-desc">Hosted transcription for larger models.</p>
+            <div class="chip-row">
+              <span class="chip chip-muted">Coming soon</span>
+            </div>
           </div>
         </div>
-        <div class="record-btn-wrap">
-          <button id="record-btn" class="record-btn idle" aria-label="Start recording">
-            <span class="record-icon" aria-hidden="true"></span>
-            <span id="record-btn-label">Start recording</span>
-          </button>
+
+        <p class="section-header">Model</p>
+        <div class="card">
+          <div class="row row-top">
+            <div>
+              <div class="row-label">Whisper model</div>
+              <div class="row-sublabel">Runs fully local — download one to transcribe. Until then, macOS Speech is used.</div>
+            </div>
+            <button id="model-refresh-btn" class="btn btn-ghost" aria-label="Refresh model list">Refresh</button>
+          </div>
+          <div id="model-list" aria-live="polite"><!-- injected by JS --></div>
         </div>
-      </div>
 
-    </div>
+        <p class="section-header">Hotkey</p>
+        <div class="card">
+          <div class="row">
+            <div class="row-label">Global shortcut</div>
+            <input id="hotkey-input" class="input-field" type="text"
+                   placeholder="CommandOrControl+Alt+Space"
+                   aria-label="Global hotkey shortcut" />
+          </div>
+          <div class="row flex-end">
+            <button id="hotkey-save-btn" class="btn btn-primary">Apply</button>
+          </div>
+        </div>
 
-  </main>
+        <p class="section-header">Activation</p>
+        <div class="card">
+          <div class="row">
+            <div>
+              <div class="row-label">Capture mode</div>
+              <div class="row-sublabel" id="mode-sublabel">Tap hotkey to start/stop</div>
+            </div>
+            <div class="seg-control" role="group" aria-label="Capture mode">
+              <button class="seg-btn" id="mode-toggle-btn" aria-pressed="true" data-mode="toggle">Toggle</button>
+              <button class="seg-btn" id="mode-ptt-btn" aria-pressed="false" data-mode="push-to-talk">Push-to-talk</button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ── Pane: Dictionary ────────────────────────────────── -->
+      <section class="pane" id="pane-dictionary" role="tabpanel" aria-labelledby="rail-dictionary">
+
+        <p class="section-header">Phrases &amp; macros</p>
+        <div class="card">
+          <table class="dict-table" aria-label="Dictionary entries">
+            <thead>
+              <tr>
+                <th scope="col">Spoken phrase</th>
+                <th scope="col">Replacement</th>
+                <th scope="col">Type</th>
+                <th scope="col" class="th-remove"><span class="sr-only">Remove</span></th>
+              </tr>
+            </thead>
+            <tbody id="dict-body"><!-- rows injected by JS --></tbody>
+          </table>
+          <!-- REAL empty state (no fake placeholder rows) — shown via JS when no rows. -->
+          <div class="stats-empty dict-empty" id="dict-empty">
+            <strong>No entries yet</strong>
+            <span>Add a phrase or macro to rewrite your transcripts.</span>
+          </div>
+          <div class="dict-footer">
+            <button id="dict-add-btn" class="btn btn-ghost">+ Add entry</button>
+            <button id="dict-save-btn" class="btn btn-primary">Save</button>
+          </div>
+        </div>
+
+        <p class="section-header tip-header">
+          Tip — macros can contain special characters, e.g. "new line" → <code class="tip-code">\n</code>,
+          "open brace" → <code class="tip-code">{</code>. Phrases rewrite spoken words, e.g. "sigma link" → SigmaLink.
+        </p>
+
+      </section>
+
+      <!-- ── Pane: Usage ─────────────────────────────────────── -->
+      <section class="pane" id="pane-usage" role="tabpanel" aria-labelledby="rail-usage">
+
+        <p class="section-header">All time</p>
+        <div class="stats-grid" aria-label="Usage statistics">
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-words">—</div>
+            <div class="stat-label">Words</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-recordings">—</div>
+            <div class="stat-label">Sessions</div>
+          </div>
+          <div class="stat-cell">
+            <div class="stat-value" id="stat-wpm">—</div>
+            <div class="stat-label">Avg WPM</div>
+          </div>
+        </div>
+
+        <p class="section-header">Recent activity</p>
+        <div class="card" id="recent-card">
+          <div class="stats-empty" id="recent-empty">No recordings yet</div>
+        </div>
+
+        <div class="row flex-end refresh-row">
+          <button id="stats-refresh-btn" class="btn btn-secondary" aria-label="Refresh usage stats">Refresh</button>
+        </div>
+
+      </section>
+
+      <!-- ── Pane: Test ──────────────────────────────────────── -->
+      <section class="pane" id="pane-test" role="tabpanel" aria-labelledby="rail-test">
+
+        <p class="section-header">Manual trigger</p>
+        <div class="card">
+          <div class="row">
+            <div>
+              <div class="row-label">Test transcription</div>
+              <div class="row-sublabel">Record a clip and transcribe immediately</div>
+            </div>
+          </div>
+          <div class="record-btn-wrap">
+            <button id="record-btn" class="record-btn idle" aria-label="Start recording">
+              <span class="record-icon" aria-hidden="true"></span>
+              <span id="record-btn-label">Start recording</span>
+            </button>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+  </div>
 
   <!-- Toast notification -->
   <div id="toast" class="toast" role="status" aria-live="polite" aria-atomic="true">
@@ -935,509 +303,6 @@
     <span class="toast-text" id="toast-text"></span>
   </div>
 
-  <!-- SR-only utility class -->
-  <style>.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}</style>
-
-  <script type="module">
-    // ── Safe API wrapper ──────────────────────────────────────────
-    // Every call is guarded: missing window.bridgeVoice or missing method
-    // degrades gracefully to a no-op / placeholder value.
-
-    const bv = window.bridgeVoice ?? null;
-
-    function hasMethod(name) {
-      return bv !== null && typeof bv[name] === 'function';
-    }
-
-    async function safeCall(name, ...args) {
-      if (!hasMethod(name)) return undefined;
-      try { return await bv[name](...args); } catch { return undefined; }
-    }
-
-    // ── Toast ─────────────────────────────────────────────────────
-    let toastTimer = null;
-    function showToast(message, level = 'info') {
-      const el = document.getElementById('toast');
-      const txt = document.getElementById('toast-text');
-      clearTimeout(toastTimer);
-      txt.textContent = message;
-      el.className = 'toast ' + level;
-      // Force reflow so transition fires even on rapid successive calls
-      void el.offsetWidth;
-      el.classList.add('visible');
-      toastTimer = setTimeout(() => el.classList.remove('visible'), 4000);
-    }
-
-    if (hasMethod('onToast')) {
-      bv.onToast(({ message, level }) => showToast(message, level));
-    }
-
-    // ── Tab navigation ────────────────────────────────────────────
-    const tabs   = document.querySelectorAll('[role="tab"]');
-    const panels = document.querySelectorAll('.panel');
-
-    function activateTab(tabEl) {
-      tabs.forEach(t => {
-        const isTarget = t === tabEl;
-        t.setAttribute('aria-selected', isTarget ? 'true' : 'false');
-      });
-      const targetPanelId = tabEl.getAttribute('aria-controls');
-      panels.forEach(p => {
-        p.classList.toggle('active', p.id === targetPanelId);
-      });
-      // Lazy-load dictionary once (avoid discarding unsaved edits); the usage
-      // panel re-fetches on every activation (getStats is a cheap sync KV read).
-      const panel = tabEl.dataset.panel;
-      if (panel === 'dictionary') loadDictionary();
-      if (panel === 'usage')      fetchAndRenderStats();
-    }
-
-    tabs.forEach(tab => {
-      tab.addEventListener('click', () => activateTab(tab));
-      tab.addEventListener('keydown', e => {
-        const idx   = [...tabs].indexOf(e.currentTarget);
-        let next = -1;
-        if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length;
-        if (e.key === 'ArrowLeft')  next = (idx - 1 + tabs.length) % tabs.length;
-        if (next !== -1) {
-          e.preventDefault();
-          tabs[next].focus();
-          activateTab(tabs[next]);
-        }
-      });
-    });
-
-    // ── State / Status helpers ────────────────────────────────────
-    function applyStatus(status) {
-      if (!status) return;
-
-      // State badge
-      const badge = document.getElementById('state-badge');
-      const text  = document.getElementById('state-text');
-      const state = status.state ?? 'idle';
-      badge.className = 'state-badge ' + state;
-      text.textContent = state;
-
-      // Enabled toggle
-      const toggle = document.getElementById('enabled-toggle');
-      toggle.checked = !!status.enabled;
-      toggle.setAttribute('aria-checked', String(!!status.enabled));
-
-      // Hotkey
-      if (status.hotkey !== undefined) {
-        document.getElementById('hotkey-input').value = status.hotkey;
-      }
-
-      // Mode
-      const mode = status.mode ?? 'toggle';
-      applyMode(mode);
-
-      // Record button
-      updateRecordBtn(state);
-    }
-
-    function applyMode(mode) {
-      const toggleBtn = document.getElementById('mode-toggle-btn');
-      const pttBtn    = document.getElementById('mode-ptt-btn');
-      const sublabel  = document.getElementById('mode-sublabel');
-      const isToggle  = mode === 'toggle';
-      toggleBtn.setAttribute('aria-pressed', String(isToggle));
-      pttBtn.setAttribute('aria-pressed',    String(!isToggle));
-      sublabel.textContent = isToggle
-        ? 'Tap hotkey to start/stop'
-        : 'Hold hotkey while speaking';
-    }
-
-    function updateRecordBtn(state) {
-      const btn   = document.getElementById('record-btn');
-      const label = document.getElementById('record-btn-label');
-      const isRec = state === 'recording';
-      btn.className = 'record-btn ' + (isRec ? 'recording' : 'idle');
-      label.textContent = isRec ? 'Stop & transcribe' : 'Start recording';
-      btn.setAttribute('aria-label', label.textContent);
-      // icon shape toggles via CSS (circle vs square) based on class
-    }
-
-    // ── Initial load ──────────────────────────────────────────────
-    async function refresh() {
-      const status = await safeCall('getStatus');
-      applyStatus(status);
-    }
-
-    refresh();
-
-    // Live state updates
-    if (hasMethod('onStateChange')) {
-      bv.onStateChange(status => applyStatus(status));
-    }
-
-    // ── Enable toggle ─────────────────────────────────────────────
-    document.getElementById('enabled-toggle').addEventListener('change', async e => {
-      const enabled = e.target.checked;
-      e.target.setAttribute('aria-checked', String(enabled));
-      await safeCall('setEnabled', enabled);
-    });
-
-    // ── Hotkey ────────────────────────────────────────────────────
-    document.getElementById('hotkey-save-btn').addEventListener('click', async () => {
-      const value = document.getElementById('hotkey-input').value.trim();
-      if (!value) return;
-      if (!hasMethod('setHotkey')) { showToast('SigmaVoice bridge unavailable', 'warn'); return; }
-      const res = await bv.setHotkey(value);
-      if (res?.ok) showToast('Hotkey updated', 'info');
-      else showToast(res?.error || 'Could not set shortcut', 'error');
-    });
-
-    // ── Mode segmented control ────────────────────────────────────
-    document.getElementById('mode-toggle-btn').addEventListener('click', async () => {
-      applyMode('toggle');
-      await safeCall('setMode', 'toggle');
-    });
-    document.getElementById('mode-ptt-btn').addEventListener('click', async () => {
-      applyMode('push-to-talk');
-      await safeCall('setMode', 'push-to-talk');
-    });
-
-    // ── Whisper models: list + download + set-active ──────────────
-    const modelListEl = document.getElementById('model-list');
-
-    function fmtModelName(m) {
-      const tag = m.isDefault ? ' · recommended' : '';
-      return m.name + ' (' + m.sizeMb + ' MB' + tag + ')';
-    }
-
-    function makeBtn(label, cls) {
-      const b = document.createElement('button');
-      b.className = 'btn ' + (cls || 'btn-ghost');
-      b.textContent = label;
-      return b;
-    }
-
-    async function renderModels() {
-      if (!hasMethod('listModels')) { modelListEl.textContent = ''; return; }
-      let models;
-      try { models = await bv.listModels(); } catch { models = null; }
-      modelListEl.replaceChildren();
-      if (!Array.isArray(models) || models.length === 0) {
-        const p = document.createElement('div');
-        p.className = 'row-sublabel';
-        p.style.padding = '8px 0';
-        p.textContent = 'No models available.';
-        modelListEl.appendChild(p);
-        return;
-      }
-      for (const m of models) {
-        const row = document.createElement('div');
-        row.className = 'row';
-        row.style.alignItems = 'center';
-
-        const left = document.createElement('div');
-        const name = document.createElement('div');
-        name.className = 'row-label';
-        name.textContent = fmtModelName(m);
-        const sub = document.createElement('div');
-        sub.className = 'row-sublabel';
-        sub.id = 'model-sub-' + m.id;
-        sub.textContent = m.active ? 'Active' : (m.downloaded ? 'Downloaded' : 'Not downloaded');
-        left.appendChild(name); left.appendChild(sub);
-
-        const right = document.createElement('div');
-        right.style.minWidth = '110px';
-        right.style.textAlign = 'right';
-        right.id = 'model-action-' + m.id;
-
-        if (m.active) {
-          const tag = document.createElement('span');
-          tag.className = 'state-badge routing';
-          tag.textContent = '✓ Active';
-          right.appendChild(tag);
-        } else if (m.downloaded) {
-          const use = makeBtn('Use', 'btn-primary');
-          use.addEventListener('click', async () => {
-            await safeCall('setModelId', m.id);
-            showToast('Active model: ' + m.name);
-            renderModels();
-          });
-          right.appendChild(use);
-        } else if (m.downloading) {
-          enterDownloadingUI(m, left, right);
-        } else {
-          const dl = makeBtn('Download', 'btn-primary');
-          dl.addEventListener('click', () => startDownload(m));
-          right.appendChild(dl);
-        }
-
-        row.appendChild(left); row.appendChild(right);
-        modelListEl.appendChild(row);
-      }
-    }
-
-    // Switch a model row into its determinate "downloading" state:
-    // a thin progress bar + byte counter under the name, a Cancel button.
-    function enterDownloadingUI(m, left, right) {
-      const sub = document.getElementById('model-sub-' + m.id);
-      if (sub) sub.textContent = 'Downloading…';
-
-      const bar = document.createElement('div');
-      bar.className = 'dl-progress';
-      bar.id = 'model-progress-' + m.id;
-      const fill = document.createElement('div');
-      fill.className = 'dl-progress-fill';
-      fill.id = 'model-progress-fill-' + m.id;
-      bar.appendChild(fill);
-      left.appendChild(bar);
-
-      right.replaceChildren();
-      const cancel = makeBtn('Cancel', 'btn-secondary');
-      cancel.addEventListener('click', () => safeCall('abortDownload', m.id));
-      right.appendChild(cancel);
-    }
-
-    async function startDownload(m) {
-      if (!hasMethod('downloadModel')) return;
-      const sub = document.getElementById('model-sub-' + m.id);
-      const action = document.getElementById('model-action-' + m.id);
-      // left cell is the parent of the sublabel; show the progress bar there
-      const left = sub?.parentElement;
-      if (sub) sub.textContent = 'Starting…';
-      if (left && action) enterDownloadingUI(m, left, action);
-      try {
-        const res = await bv.downloadModel(m.id);
-        if (res?.aborted) showToast('Download cancelled', 'info');
-        else if (res && res.ok === false) showToast('Download failed: ' + (res.error || 'unknown'), 'error');
-      } catch (err) {
-        showToast('Download failed', 'error');
-      }
-      renderModels();
-    }
-
-    if (hasMethod('onModelDownload')) {
-      bv.onModelDownload(p => {
-        if (!p || !p.modelId) return;
-        const sub = document.getElementById('model-sub-' + p.modelId);
-        if (!sub) return;
-        // Terminal states reset the row to its idle layout
-        if (p.error)    { showToast('Download failed: ' + p.error, 'error'); renderModels(); return; }
-        if (p.aborted)  { renderModels(); return; }
-        if (p.done)     { sub.textContent = 'Downloaded'; renderModels(); return; }
-        const fill = document.getElementById('model-progress-fill-' + p.modelId);
-        if (fill) fill.style.width = ((p.fraction || 0) * 100) + '%';
-        if (p.bytesTotal) {
-          sub.textContent = (p.bytesDone / 1e6).toFixed(0) + ' of ' + (p.bytesTotal / 1e6).toFixed(0) + ' MB';
-        } else {
-          sub.textContent = 'Downloading… ' + Math.round((p.fraction || 0) * 100) + '%';
-        }
-      });
-    }
-
-    document.getElementById('model-refresh-btn').addEventListener('click', renderModels);
-    renderModels();
-
-    // ── Record button (Test panel) ────────────────────────────────
-    document.getElementById('record-btn').addEventListener('click', async () => {
-      const status = await safeCall('getStatus');
-      if (status?.state === 'recording') {
-        await safeCall('stopAndTranscribe');
-      } else {
-        await safeCall('startRecording');
-      }
-    });
-
-    // ── Dictionary ────────────────────────────────────────────────
-    let dictLoaded = false;
-
-    async function loadDictionary() {
-      if (dictLoaded) return;
-      dictLoaded = true;
-      const entries = await safeCall('getDictionary');
-      renderDictionary(Array.isArray(entries) ? entries : []);
-    }
-
-    function renderDictionary(entries) {
-      const body = document.getElementById('dict-body');
-      body.replaceChildren();
-      if (!entries.length) {
-        // Genuine empty state — a single muted message row (not saved as data)
-        const tr = document.createElement('tr');
-        tr.className = 'dict-empty-row';
-        const td = document.createElement('td');
-        td.colSpan = 4;
-        td.className = 'stats-empty';
-        td.textContent = 'No phrases or macros yet — use “+ Add entry”.';
-        tr.appendChild(td);
-        body.appendChild(tr);
-        return;
-      }
-      entries.forEach(entry => appendDictRow(entry));
-    }
-
-    function appendDictRow(entry = { pattern: '', replacement: '', type: 'phrase' }) {
-      const safeType = (entry.type === 'macro') ? 'macro' : 'phrase';
-
-      // -- Pattern input
-      const patternInput = document.createElement('input');
-      patternInput.className   = 'dict-input';
-      patternInput.type        = 'text';
-      patternInput.value       = String(entry.pattern ?? '');
-      patternInput.placeholder = 'spoken phrase';
-      patternInput.setAttribute('aria-label', 'Spoken phrase');
-
-      // -- Replacement input
-      const replacementInput = document.createElement('input');
-      replacementInput.className   = 'dict-input dict-input-replacement';
-      replacementInput.type        = 'text';
-      replacementInput.value       = String(entry.replacement ?? '');
-      replacementInput.placeholder = 'replacement text';
-      replacementInput.setAttribute('aria-label', 'Replacement text');
-
-      // -- Type chip button
-      const chip = document.createElement('button');
-      chip.className   = 'type-chip ' + safeType;
-      chip.dataset.type = safeType;
-      chip.textContent = safeType;
-      chip.setAttribute('aria-label', 'Toggle type between phrase and macro');
-      chip.title = 'Click to toggle type';
-      chip.addEventListener('click', () => {
-        const next = chip.dataset.type === 'phrase' ? 'macro' : 'phrase';
-        chip.dataset.type = next;
-        chip.className  = 'type-chip ' + next;
-        chip.textContent = next;
-      });
-
-      // -- Remove button
-      const removeBtn = document.createElement('button');
-      removeBtn.className   = 'dict-remove-btn';
-      removeBtn.textContent = '×';
-      removeBtn.setAttribute('aria-label', 'Remove entry');
-
-      // -- Assemble cells
-      const tdPattern     = document.createElement('td');
-      const tdReplacement = document.createElement('td');
-      const tdType        = document.createElement('td');
-      const tdRemove      = document.createElement('td');
-      tdPattern.appendChild(patternInput);
-      tdReplacement.appendChild(replacementInput);
-      tdType.appendChild(chip);
-      tdRemove.appendChild(removeBtn);
-
-      const tr = document.createElement('tr');
-      tr.appendChild(tdPattern);
-      tr.appendChild(tdReplacement);
-      tr.appendChild(tdType);
-      tr.appendChild(tdRemove);
-
-      removeBtn.addEventListener('click', () => tr.remove());
-
-      document.getElementById('dict-body').appendChild(tr);
-    }
-
-    document.getElementById('dict-add-btn').addEventListener('click', () => {
-      // Clear the empty-state placeholder before adding the first real row
-      document.querySelector('#dict-body .dict-empty-row')?.remove();
-      appendDictRow({ pattern: '', replacement: '', type: 'phrase' });
-      // Focus the new pattern input
-      const rows = document.querySelectorAll('#dict-body tr');
-      const last = rows[rows.length - 1];
-      last?.querySelector('input')?.focus();
-    });
-
-    document.getElementById('dict-save-btn').addEventListener('click', async () => {
-      const rows = document.querySelectorAll('#dict-body tr');
-      const entries = [];
-      rows.forEach(row => {
-        const inputs = row.querySelectorAll('input');
-        const chip   = row.querySelector('.type-chip');
-        const pattern     = inputs[0]?.value?.trim() ?? '';
-        const replacement = inputs[1]?.value ?? '';
-        const type        = chip?.dataset.type ?? 'phrase';
-        if (pattern) entries.push({ pattern, replacement, type });
-      });
-      if (!hasMethod('setDictionary')) { showToast('SigmaVoice bridge unavailable', 'warn'); return; }
-      const saved = (await bv.setDictionary(entries)) ?? [];
-      if (!Array.isArray(saved)) { showToast('Could not save dictionary', 'error'); return; }
-      if (saved.length < entries.length) {
-        showToast(`Saved ${saved.length} entries; ${entries.length - saved.length} dropped (empty or too long)`, 'warn');
-      } else {
-        showToast(`Saved ${saved.length} entries`, 'info');
-      }
-    });
-
-    // ── Usage / Stats ─────────────────────────────────────────────
-    async function fetchAndRenderStats() {
-      const stats = await safeCall('getStats');
-      renderStats(stats);
-    }
-
-    function renderStats(stats) {
-      const words      = stats?.totalWords    ?? null;
-      const recordings = stats?.recordings    ?? null;
-      const avgWpm     = stats?.avgWpm        ?? null;
-      const recent     = stats?.recent        ?? [];
-
-      document.getElementById('stat-words').textContent      = words      != null ? fmtNum(words)      : '—';
-      document.getElementById('stat-recordings').textContent = recordings != null ? fmtNum(recordings) : '—';
-      document.getElementById('stat-wpm').textContent        = avgWpm     != null ? Math.round(avgWpm) : '—';
-
-      const card  = document.getElementById('recent-card');
-      const empty = document.getElementById('recent-empty');
-
-      // Remove any previously rendered rows (keep empty placeholder)
-      card.querySelectorAll('.recent-row').forEach(r => r.remove());
-
-      if (!recent.length) {
-        empty.style.display = 'block';
-        return;
-      }
-
-      empty.style.display = 'none';
-
-      recent.slice(0, 8).forEach(rec => {
-        const row = document.createElement('div');
-        row.className = 'row recent-row';
-
-        const timeEl = document.createElement('span');
-        timeEl.className   = 'recent-time';
-        timeEl.textContent = fmtTime(rec.timestamp);
-
-        const wordsEl = document.createElement('span');
-        wordsEl.className   = 'recent-words';
-        wordsEl.textContent = fmtNum(rec.words ?? 0) + ' words';
-
-        const wpmEl = document.createElement('span');
-        wpmEl.className   = 'recent-wpm';
-        wpmEl.textContent = Math.round(rec.wpm ?? 0) + ' wpm';
-
-        row.appendChild(timeEl);
-        row.appendChild(wordsEl);
-        row.appendChild(wpmEl);
-        card.appendChild(row);
-      });
-    }
-
-    document.getElementById('stats-refresh-btn').addEventListener('click', async () => {
-      await fetchAndRenderStats();
-      showToast('Stats refreshed');
-    });
-
-    // ── Utility ───────────────────────────────────────────────────
-    function fmtNum(n) {
-      return Number(n).toLocaleString();
-    }
-    function fmtTime(ts) {
-      if (!ts) return '—';
-      const d = new Date(ts);
-      const now = Date.now();
-      const diff = now - ts;
-      if (diff < 60_000)   return 'Just now';
-      if (diff < 3_600_000) return Math.floor(diff / 60_000) + 'm ago';
-      if (diff < 86_400_000) return Math.floor(diff / 3_600_000) + 'h ago';
-      return d.toLocaleDateString(undefined, { month:'short', day:'numeric' });
-    }
-
-    // ── Degrade gracefully if bridgeVoice absent ──────────────────
-    if (!bv) {
-      showToast('SigmaVoice bridge unavailable — some features disabled', 'warn');
-    }
-  </script>
+  <script type="module" src="./js/settings.js"></script>
 </body>
 </html>

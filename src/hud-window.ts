@@ -33,8 +33,18 @@
 
 import { BrowserWindow, screen } from 'electron';
 
-/** State pushed to the renderer over the `hud:state` channel. */
-export type HudState = 'recording' | 'transcribing';
+/**
+ * State pushed to the renderer over the `hud:state` channel.
+ *
+ * 'recording' and 'transcribing' are driven today by the capture controller
+ * (showRecording/showTranscribing). The remaining three are render-ready for
+ * future engine signals — the renderer paints them via the `data-state`
+ * attribute, but no controller method emits them yet:
+ *   - 'error'    — the mic / input device is unavailable.
+ *   - 'no-input' — capture started but no audio is arriving.
+ *   - 'done'     — a brief success flash before the overlay hides.
+ */
+export type HudState = 'recording' | 'transcribing' | 'error' | 'no-input' | 'done';
 
 /** Controller the lead drives from main.ts to show/hide the overlay. */
 export interface HudController {

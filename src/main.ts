@@ -38,6 +38,7 @@ import {
   WHISPER_SAMPLE_RATE,
 } from '@sigmalink/voice-core';
 import { isValidAccelerator } from './accelerator';
+import { formatAccelerator } from './keycaps';
 import { createFileKv, type KvStore } from './kv-store';
 import { getDictionary, setDictionary, getStatsSummary } from './settings-data';
 import { createHudWindow, type HudController } from './hud-window';
@@ -130,7 +131,7 @@ function buildTrayMenu(): Electron.Menu {
       label: isRecording
         ? 'Stop recording'
         : isEnabled
-          ? `Start recording (${status?.hotkey ?? ''})`
+          ? `Start recording (${formatAccelerator(status?.hotkey ?? '')})`
           : 'Global capture (disabled)',
       enabled: isEnabled,
       click: () => {
@@ -192,10 +193,20 @@ function openSettingsWindow(): void {
   }
 
   settingsWindow = new BrowserWindow({
-    width: 480,
-    height: 520,
+    width: 720,
+    height: 560,
+    minWidth: 680,
+    minHeight: 520,
     title: 'SigmaVoice Settings',
     show: false,
+    // macOS sidebar app chrome: inset traffic lights over a draggable sidebar
+    // header, real window vibrancy behind a transparent body, no opaque backing
+    // so the vibrancy material shows through. On win/linux these are ignored or
+    // degrade to a plain window — the CSS provides solid surfaces there.
+    titleBarStyle: 'hiddenInset',
+    vibrancy: 'sidebar',
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
