@@ -11,16 +11,16 @@ import { hasMethod, safeCall } from './settings.js';
 import { acceleratorTokens } from './keycaps.js';
 import { fmtNum, fmtTime } from './usage.js';
 
-// modelId → display name, lazily populated from listModels().
-let modelNames = null;
+// modelId → { name, downloaded }, lazily populated from listModels().
+let modelInfo = null;
 let lastModelId = null;
 
 async function ensureModelNames() {
-  if (modelNames || !hasMethod('listModels')) return;
+  if (modelInfo || !hasMethod('listModels')) return;
   const models = await safeCall('listModels');
   if (Array.isArray(models)) {
-    modelNames = new Map(models.map((m) => [m.id, m.name]));
-    // Re-resolve the label now that names are known.
+    modelInfo = new Map(models.map((m) => [m.id, { name: m.name, downloaded: !!m.downloaded }]));
+    // Re-resolve the label now that names/readiness are known.
     if (lastModelId !== null) setModelLabel(lastModelId);
   }
 }
@@ -28,8 +28,11 @@ async function ensureModelNames() {
 function setModelLabel(modelId) {
   const el = document.getElementById('overview-model');
   if (!el) return;
-  const name = modelId && modelNames ? modelNames.get(modelId) : null;
-  el.textContent = name || modelId || 'macOS Speech';
+  const info = modelId && modelInfo ? modelInfo.get(modelId) : null;
+  // The engine only uses a Whisper model once its file is downloaded; until then
+  // it falls back to macOS Speech — don't imply a Whisper model is active.
+  if (info && !info.downloaded) { el.textContent = 'macOS Speech'; return; }
+  el.textContent = (info && info.name) || modelId || 'macOS Speech';
 }
 
 /** Render the hotkey as keycap <kbd> glyphs into the given container. */

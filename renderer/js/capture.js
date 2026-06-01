@@ -31,7 +31,9 @@ export function applyCaptureStatus(status) {
   if (!status) return;
   if (status.hotkey !== undefined) {
     const input = document.getElementById('hotkey-input');
-    if (input) input.value = status.hotkey;
+    // Don't clobber the field while the user is mid-edit (a live state event
+    // must not wipe an unsaved shortcut they're typing).
+    if (input && document.activeElement !== input) input.value = status.hotkey;
   }
   applyMode(status.mode ?? 'toggle');
 }
