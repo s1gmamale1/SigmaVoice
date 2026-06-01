@@ -51,8 +51,12 @@
         0 8px 24px rgba(0, 0, 0, 0.45),
         inset 0 0.5px 0 rgba(255, 255, 255, 0.18);
       color: #f2f2f7;
-      /* Entrance animation. */
-      animation: hud-in 240ms cubic-bezier(0.22, 1, 0.36, 1) both;
+      /* Entrance animation. A CSS linear() spring approximation (a gentle
+       * over-shoot + settle) instead of a cubic-bezier — feels alive without
+       * a JS spring. Samples below trace a lightly-damped spring response. */
+      animation: hud-in 420ms linear(
+        0, 0.012, 0.094, 0.262, 0.487, 0.718, 0.901, 1.018,
+        1.07, 1.069, 1.038, 1.0, 0.984, 0.989, 0.998, 1.001, 1) both;
     }
 
     @keyframes hud-in {
@@ -97,45 +101,129 @@
     .pill[data-state="transcribing"] .spinner { display: block; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* --- decorative animated equalizer (NOT real audio) --- */
-    .eq {
+    /* --- HONEST 'listening' indicator ---
+     * NOT an audio-level meter. A single calm, breathing waveform glyph that
+     * indicates "I'm listening" WITHOUT pretending to track your voice level.
+     * It's an indeterminate state cue, like a spinner — never claims to know
+     * how loud you are. (Replaces the old fake equalizer, which bounced even
+     * during silence — a lie about what the app could hear.) */
+    .wave {
       flex: 1 1 auto;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 3px;
       height: 22px;
+      color: #0a84ff;                 /* systemBlue (dark) */
     }
-    .eq .bar {
-      width: 3px;
-      height: 100%;
-      border-radius: 2px;
-      background: linear-gradient(180deg, #5ac8fa, #0a84ff);
+    .wave svg {
+      width: 100%;
+      height: 16px;
+      display: block;
+      overflow: visible;
+    }
+    .wave path {
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      /* Calm breathing: the whole glyph gently swells/fades on a slow cycle.
+       * It does NOT deform per-amplitude — there is nothing dishonest here. */
       transform-origin: center;
-      transform: scaleY(0.25);
-      animation: eq-bounce 1s ease-in-out infinite;
+      animation: wave-breathe 2.4s ease-in-out infinite;
     }
-    /* Stagger the bars so they ripple like a waveform. */
-    .eq .bar:nth-child(1) { animation-delay: 0.00s; }
-    .eq .bar:nth-child(2) { animation-delay: 0.12s; }
-    .eq .bar:nth-child(3) { animation-delay: 0.24s; }
-    .eq .bar:nth-child(4) { animation-delay: 0.36s; }
-    .eq .bar:nth-child(5) { animation-delay: 0.48s; }
-    .eq .bar:nth-child(6) { animation-delay: 0.30s; }
-    .eq .bar:nth-child(7) { animation-delay: 0.18s; }
-    @keyframes eq-bounce {
-      0%, 100% { transform: scaleY(0.22); }
-      50%      { transform: scaleY(1); }
+    @keyframes wave-breathe {
+      0%, 100% { opacity: 0.55; transform: scaleY(0.82); }
+      50%      { opacity: 1;    transform: scaleY(1.08); }
     }
 
-    /* Transcribing: calm the equalizer into a gentle shimmer (no bouncing). */
-    .pill[data-state="transcribing"] .eq .bar {
-      background: linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0.25));
-      animation: eq-shimmer 1.2s ease-in-out infinite;
+    /* Transcribing: still the breathing, dim to a flat neutral line — work is
+     * happening downstream, not at the mic. */
+    .pill[data-state="transcribing"] .wave {
+      color: rgba(255, 255, 255, 0.4);
     }
-    @keyframes eq-shimmer {
-      0%, 100% { transform: scaleY(0.32); opacity: 0.5; }
-      50%      { transform: scaleY(0.5);  opacity: 0.9; }
+    .pill[data-state="transcribing"] .wave path {
+      animation: wave-shimmer 1.6s ease-in-out infinite;
+    }
+    @keyframes wave-shimmer {
+      0%, 100% { opacity: 0.35; }
+      50%      { opacity: 0.7; }
+    }
+
+    /* --- icon glyph (error ⚠ / done ✓), hidden in normal states --- */
+    .glyph {
+      display: none;
+      flex: 0 0 auto;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    /* === ERROR: mic unavailable === */
+    .pill[data-state="error"] .dot,
+    .pill[data-state="error"] .spinner,
+    .pill[data-state="error"] .wave,
+    .pill[data-state="error"] .timer { display: none; }
+    .pill[data-state="error"] .indicator .glyph {
+      display: block;
+      color: #ff453a;                 /* systemRed (dark) */
+    }
+    .pill[data-state="error"] .label {
+      display: block;
+      color: #ff453a;
+    }
+
+    /* === NO-INPUT: capture running, nothing arriving (dimmed hint) === */
+    .pill[data-state="no-input"] .dot {
+      /* keep the recording context but desaturate + calm it */
+      background: #8e8e93;            /* systemGray */
+      box-shadow: none;
+      animation: dot-pulse 2.2s ease-in-out infinite;
+    }
+    .pill[data-state="no-input"] .wave { color: rgba(255, 255, 255, 0.22); }
+    .pill[data-state="no-input"] .timer { color: #8e8e93; }
+    .pill[data-state="no-input"] .label {
+      display: block;
+      color: #aeaeb2;
+    }
+
+    /* === DONE: brief success check flash === */
+    .pill[data-state="done"] .dot,
+    .pill[data-state="done"] .spinner,
+    .pill[data-state="done"] .wave,
+    .pill[data-state="done"] .timer { display: none; }
+    .pill[data-state="done"] .indicator .glyph {
+      display: block;
+      color: #30d158;                 /* systemGreen (dark) */
+      animation: done-flash 600ms ease-out both;
+    }
+    @keyframes done-flash {
+      0%   { opacity: 0; transform: scale(0.6); }
+      40%  { opacity: 1; transform: scale(1.15); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Inline status label (shown only in error / no-input states). */
+    .label {
+      display: none;
+      flex: 1 1 auto;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-align: center;
+    }
+
+    /* Visually-hidden live region — announces state to screen readers without
+     * occupying layout. (The visual elements are aria-hidden.) */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
     }
 
     /* --- timer --- */
@@ -158,41 +246,66 @@
       .pill { animation: none; }
       .dot { animation: none; }
       .spinner { animation: none; }
-      .eq .bar { animation: none !important; transform: scaleY(0.5); }
+      /* Freeze the breathing waveform at a calm, static mid-state. */
+      .wave path { animation: none !important; opacity: 0.85; transform: none; }
+      .pill[data-state="done"] .indicator .glyph { animation: none; }
     }
   </style>
 </head>
 <body>
   <!-- Default markup renders the 'recording' state so the HUD is visible even
        if no preload / no state event ever arrives (fail-visible). -->
-  <div class="pill" id="pill" data-state="recording" role="status" aria-live="polite">
+  <div class="pill" id="pill" data-state="recording" role="status">
     <div class="indicator">
       <div class="dot" aria-hidden="true"></div>
       <div class="spinner" aria-hidden="true"></div>
+      <!-- ⚠ in 'error', ✓ in 'done'; CSS picks which (if any) is shown. -->
+      <span class="glyph" id="glyph" aria-hidden="true">&#9888;</span>
     </div>
-    <div class="eq" aria-hidden="true">
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
-      <span class="bar"></span>
+    <!-- HONEST 'listening' glyph: a calm breathing waveform, NOT a level meter. -->
+    <div class="wave" aria-hidden="true">
+      <svg viewBox="0 0 64 16" preserveAspectRatio="none" role="presentation">
+        <path d="M2 8 Q8 8 11 4 T20 8 T29 8 T38 12 T47 8 T56 4 T62 8" />
+      </svg>
     </div>
+    <!-- Inline status text for error / no-input (CSS toggles visibility). -->
+    <div class="label" id="label" aria-hidden="true"></div>
     <div class="timer" id="timer" aria-label="Elapsed time">00:00</div>
+    <!-- Live region: applyState() sets textContent per state for screen readers. -->
+    <span class="sr-only" id="srStatus" aria-live="polite">Recording</span>
   </div>
 
   <script type="module">
     // -----------------------------------------------------------------------
     // Contract assumed from the HUD preload (the lead exposes EXACTLY this):
     //   window.sigmaHud.onState((payload) => { ... })
-    //   payload = { state: 'recording' | 'transcribing' }
-    // If window.sigmaHud is missing we leave the static 'recording' markup in
-    // place so the overlay still shows something useful.
+    //   payload = { state: 'recording' | 'transcribing'
+    //                     | 'error' | 'no-input' | 'done' }
+    // The last three are render-ready for future engine signals; the controller
+    // only emits 'recording'/'transcribing' today. If window.sigmaHud is missing
+    // we leave the static 'recording' markup in place so the overlay still shows
+    // something useful.
     // -----------------------------------------------------------------------
+
+    const STATES = ['recording', 'transcribing', 'error', 'no-input', 'done'];
+
+    // Screen-reader announcement per state (matches the visual semantics).
+    const SR_LABEL = {
+      'recording': 'Recording',
+      'transcribing': 'Transcribing…',
+      'error': 'Mic unavailable',
+      'no-input': 'No input',
+      'done': 'Done',
+    };
+
+    const WARN = '⚠'; // ⚠ error
+    const CHECK = '✓'; // ✓ done
 
     const pill = document.getElementById('pill');
     const timerEl = document.getElementById('timer');
+    const labelEl = document.getElementById('label');
+    const glyphEl = document.getElementById('glyph');
+    const srStatus = document.getElementById('srStatus');
 
     // --- elapsed timer (owned entirely by the renderer) ---
     // The display has 1-second granularity, so a 60fps rAF loop is wasteful.
@@ -234,14 +347,40 @@
     }
 
     function applyState(state) {
+      if (!STATES.includes(state)) return;
       // Un-hide if a prior click-to-dismiss hid the pill locally.
       pill.style.display = '';
-      if (state === 'recording') {
-        pill.setAttribute('data-state', 'recording');
-        startTimer();
-      } else if (state === 'transcribing') {
-        pill.setAttribute('data-state', 'transcribing');
-        stopTimer(); // freeze the elapsed time
+      pill.setAttribute('data-state', state);
+      // Always announce the new state to screen readers (visuals are aria-hidden).
+      srStatus.textContent = SR_LABEL[state];
+
+      switch (state) {
+        case 'recording':
+          // Live recording: run the elapsed timer; honest breathing waveform.
+          labelEl.textContent = '';
+          startTimer();
+          break;
+        case 'transcribing':
+          // Work moved downstream — freeze the elapsed time, calm the waveform.
+          labelEl.textContent = '';
+          stopTimer();
+          break;
+        case 'error':
+          // Mic unavailable: ⚠ + inline red label, no timer.
+          stopTimer();
+          glyphEl.textContent = WARN;
+          labelEl.textContent = 'Mic unavailable';
+          break;
+        case 'no-input':
+          // Capture running but nothing arriving: dimmed hint alongside the timer.
+          labelEl.textContent = 'No input — check your mic';
+          break;
+        case 'done':
+          // Brief success check before the overlay hides.
+          stopTimer();
+          glyphEl.textContent = CHECK;
+          labelEl.textContent = '';
+          break;
       }
     }
 
@@ -266,7 +405,7 @@
     const hud = window.sigmaHud;
     if (hud && typeof hud.onState === 'function') {
       hud.onState((payload) => {
-        if (payload && (payload.state === 'recording' || payload.state === 'transcribing')) {
+        if (payload && STATES.includes(payload.state)) {
           applyState(payload.state);
         }
       });
