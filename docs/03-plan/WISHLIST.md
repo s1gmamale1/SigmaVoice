@@ -15,6 +15,31 @@
 
 ---
 
+## 🔬 Deep review findings (2026-06-04) — on-device test of the INSTALLED build
+
+**Context.** Operator installed `/Applications/SigmaVoice.app` and reported 4 symptoms (model unsure-downloaded · Cmd+Shift PTT does nothing · recording "animation is fake / nothing happens" · no floating pill). Root-caused by 4 parallel read-only agents + device-state forensics. **Headline: the installed app is `v0.3.1`** (`CFBundleShortVersionString 0.3.1`, binary built 2026-05-29 16:42, *before* the v0.3.2 tag) — **two releases behind `main`**. `main` is **16 commits ahead of v0.3.2** and **14 ahead of `origin/main` (never pushed)**, **never released**. So ~half the symptoms are *already fixed on `main`* (just unshipped); the rest are genuine open gaps.
+
+### ✅ Already fixed on `main` → real action is **push + cut a release + re-smoke**
+- **[crash] Record-start SIGABRT on non-48 kHz mics** — `Recognizer::Start` → `installTapOnBus:format:fmt` (stale pre-`prepare` format read) raises an uncatchable NSException on the operator's 44.1 kHz/2-ch mic → process aborts the instant recording starts. **This IS symptom (c)** ("animation then nothing": the HUD started, the native engine died). The v0.3.2 fix the operator lacks. `sigmalink/app/native/voice-mac/src/recognizer.mm` (v0.3.1 pin `a7ba0fc` buggy → v0.3.2 **and main** pin `35a290e`, `format:nil`). Evidence: `~/Library/Logs/DiagnosticReports/SigmaVoice-2026-05-29-1644*.ips`. sev critical / **ship-only**.
+- **[hud] Fake decorative equalizer** — v0.3.1 `renderer/hud.html:99-130` literally `/* decorative animated equalizer (NOT real audio) */`, bounced even in silence. Fixed by UX-6 on main (honest "breathing" indicator). Operator's read ("just decoration") was correct **for v0.3.1**. sev med / **ship-only**.
+- **[model] No download mechanism exists in v0.3.1** — model UI is a bare `<select>` (`v0.3.1:renderer/settings.html:824-828`) whose only action is `setModelId`→KV; **no `downloadModel`/`abortDownload`/progress IPC in the bundle**. Selecting "Small (182 MB)" persisted `modelId=small.en-q5_1` but fetched **zero bytes** (confirmed: no model file/partial/`voice-models` dir under `~/Library/Application Support/@sigmalink/sigma-voice/`). At transcribe time → silent fallback to macOS Speech. **This IS symptom (a).** Fixed on main: full download IPC + determinate progress + Cancel + honest Overview label (`462ca7c`; `renderer/js/capture.js:110-156`, `renderer/js/overview.js:31-35`). sev high / **ship-only**.
+
+### 🐞 Still open even on `main` — genuine new work
+- ✅ **[built → ROADMAP Phase 1.5, 2026-06-04] Modifier-only / hold-to-talk hotkey** — operator's saved hotkey `CommandOrControl+Alt` is **modifier-only (no base key)**; Electron `globalShortcut.register` can't bind it (`sigmalink/app/packages/voice-core/src/global-capture.ts:372`) and `resolveMainKey` returns null for bare modifiers (`src/hotkey-manager.ts:151,177`). main's UX-10 only *reports* the failure honestly — it does **not** make "hold ⌘/⌥ to talk" (the BridgeVoice pattern) work. **This IS symptom (b).** Fix (app-shell): let `node-global-key-listener` own BOTH down+up edges for a modifier-only PTT binding — `src/hotkey-manager.ts` (DOWN-edge + `resolveModifierKey`), `src/accelerator.ts` (accept 1 modifier when mode=PTT), `src/main.ts:254-262,430-438` (wire `onPushToTalkPress`). Needs Input-Monitoring permission. sev high / effort **M**.
+- ✅ **[built → ROADMAP Phase 1.5, 2026-06-04] Hotkey "press keys to record shortcut" capture UX** — (was: raw text input) `renderer/settings.html:187`; save reads `.value.trim()` raw (`renderer/js/capture.js:243-257`). No keystroke→accelerator mapper exists in either version, so "Command+Shift" never made it in — the operator hand-edited the default `…Alt+Space` down to `…Alt`. Fix: a record-shortcut control that captures `keydown` modifiers+key → valid accelerator (and, for PTT, allows a bare modifier). sev med / effort **S–M**. (Pairs with the modifier-PTT fix.)
+- ✅ **[built → ROADMAP Phase 1.5, 2026-06-04] FE-2 floating pill** (was: not built; Phase 2 → pulled forward) — only 2 windows exist (settings + transient HUD); HUD hides on any non-record state (`src/main.ts:110-117`), so there's no idle/always-visible/click-to-dictate affordance. **This IS symptom (d).** Hard part already solved in `src/hud-window.ts` (non-activating panel: `focusable:false :125`, `showInactive :209`, `type:'panel' :139`, blur-on-focus guard `:168-171`). Needs: persistent idle state + a **renderer→main IPC** (preload is one-way today, `src/hud-preload.ts:8-12`) to call `bv:startRecording`/`bv:stopAndTranscribe` (`src/main.ts:281-282`) + drag + KV position persist. Risk: accept pointer events for click/drag while never taking keyboard focus. effort **L**. (Corroborates FE-2 + de-stales its refs.)
+
+### 🔧 Optimizations / latent (lower priority)
+- 🐞 **[low] Model-row "✓ Active" pill keyed on selected id, not disk presence** — `src/main.ts:308` + `renderer/js/capture.js:122,135-139`; a persisted-but-absent modelId (e.g. carried over from v0.3.1) shows "✓ Active" while the engine is on Speech fallback. (Overview label IS honest.) effort S.
+- 🐞 **[low] `setModelId` persists selection independent of download** — `global-capture.ts:769-775`; a cancelled/failed download still reads "selected" with no bytes. Decide selection semantics. effort S.
+- 🐞 **[low] Silent pipeline no-ops** — empty transcript returns with **no toast** (`global-capture.ts:533-536`); transcribe errors are `console.warn`-only (`:505-525`). On a *fixed* build these are the next "nothing happened" surfaces. effort S.
+- **[doc] ROADMAP Phase-2 FE-2 line refs are stale** — `ROADMAP.md:145` cites old layout; actuals: `hud-window.ts` `:125`/`:209`/`:139`/`:168-171`, `main.ts:281-282`. Fix when FE-2 starts.
+
+### 📋 ROADMAP status correction
+The "✅ Done — pending push + on-device smoke" block (below) is **validated as correct code that was never shipped**: the on-device smoke just happened — on the **wrong (v0.3.1) build**. Phase 0/1 are merged to `main` but **unpushed (14 commits) + unreleased**. **Next action (operator-owned): push `main` → tag a release → re-run the live smoke on the new DMG**, which should clear symptoms (a) + (c) outright. Then schedule the two real gaps (modifier-PTT + hotkey-capture UX) and FE-2.
+
+---
+
 ## 🔎 How SigmaVoice compares to BridgeVoice (the inspiration)
 
 BridgeVoice = BridgeMind's **Tauri/Rust, account-gated ($40/mo), cloud-preferring** dictation app *for
@@ -65,8 +90,8 @@ Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality revie
 - ✅ **UX-16** Accent consistency (systemGreen overloaded: switch-on **and** `routing` badge). `low/S`
 
 ## 🅲 Recording HUD & floating pill
-- **FE-2** Floating always-visible dictation pill (idle/listening/processing, draggable, click-to-dictate,
-  position persisted) — **BridgeVoice signature**; extends the existing focus-preserving HUD. `medium/L`
+- ~~**FE-2** Floating always-visible dictation pill (idle/listening/processing, draggable, click-to-dictate,
+  position persisted) — **BridgeVoice signature**; extends the existing focus-preserving HUD. `medium/L`~~ → **promoted to ROADMAP Phase 1.5** (2026-06-04).
 - ✅ **UX-6** Replace the FAKE equalizer with an honest "listening" animation (app-shell now; real audio level
   = 🔧 **ENG-5**). `medium/M`
 - ✅ **UX-8** HUD states: idle/error/no-input/done (render now; richer triggers need 🔧 engine). `medium/M`
@@ -93,7 +118,7 @@ Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality revie
 - **FE-11** Local what's-new / changelog modal (bundled JSON, no network). `low/S`
 - **FE-14** Version-check nag (GitHub latest tag vs `app.getVersion()`, link to download — no self-update).
   `low/M`
-- **FE-13** Widget appearance toggle (logo+text ↔ logo-only) + show/hide (after FE-2). `low/S`
+- ~~**FE-13** Widget appearance toggle (logo+text ↔ logo-only) + show/hide (after FE-2). `low/S`~~ → **promoted to ROADMAP Phase 1.5** (2026-06-04).
 - **FE-10** "Mute system audio while listening" toggle (CoreAudio ducking). `low/M`
 - **FE-12** Multilingual local whisper model in the download UX — a **local-first edge over BridgeVoice**
   (🔧 model config). `low/S`

@@ -25,24 +25,20 @@ import {
 import {
   buildGlobalCaptureController,
   type GlobalCaptureController,
-  MODEL_CATALOG,
-  isModelDownloaded,
-  downloadModel,
-  abortDownload,
-  isDownloading,
-  type DownloadProgress,
   getWhisperEngine,
   getModelById,
   getDefaultModel,
   getDownloadedModelPath,
   WHISPER_SAMPLE_RATE,
 } from '@sigmalink/voice-core';
-import { isValidAccelerator } from './accelerator';
+import { isValidAccelerator, isValidPushToTalkBinding } from './accelerator';
 import { formatAccelerator } from './keycaps';
 import { createFileKv, type KvStore } from './kv-store';
 import { getDictionary, setDictionary, getStatsSummary } from './settings-data';
 import { createHudWindow, type HudController } from './hud-window';
-import { createHotkeyManager, type HotkeyManager } from './hotkey-manager';
+import { createHotkeyManager, resolveModifierKeys, type HotkeyManager } from './hotkey-manager';
+import { isPillEnabled, pillHudDeps, registerPillIpc } from './pill';
+import { registerModelIpc } from './model-ipc';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -62,6 +58,9 @@ let kv: KvStore | null = null;
 function getModelsDir(): string {
   return path.join(app.getPath('userData'), 'voice-models');
 }
+
+// Floating-pill settings + click/drag IPC live in src/pill.ts; Whisper
+// model-management IPC in src/model-ipc.ts (kept out of this orchestrator).
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -105,6 +104,22 @@ function warnPushToTalkDegraded(): void {
       level: 'warn',
     });
   }
+}
+
+/**
+ * The engine binds every hotkey via Electron `globalShortcut`, which CANNOT
+ * register a bare-modifier accelerator and emits a "Could not register hotkey …"
+ * warn toast when it fails. For a bare-modifier push-to-talk binding that failure
+ * is expected and harmless — our hotkey-manager owns that trigger directly — so
+ * we swallow that one toast app-shell-side instead of telling the user the
+ * shortcut is broken when it actually works. (Clean fix = an engine flag to skip
+ * globalShortcut for app-owned bindings; matching the message keeps this
+ * app-shell-only. Fails open: if the engine wording changes the toast reappears.)
+ */
+function isExpectedBareModifierRegisterToast(payload: unknown): boolean {
+  const msg = (payload as { message?: string } | null)?.message ?? '';
+  const m = /could not register hotkey (.+?)\./i.exec(msg);
+  return m != null && resolveModifierKeys(m[1]) !== null;
 }
 
 /** Drive the HUD overlay from capture-state changes. */
@@ -253,8 +268,18 @@ function registerIpc(): void {
   // accelerator instead of us silently dropping it.
   ipcMain.handle('bv:setHotkey', (_e, hotkey: string): { ok: boolean; error?: string } => {
     const hk = typeof hotkey === 'string' ? hotkey.trim() : '';
-    if (!isValidAccelerator(hk)) {
-      return { ok: false, error: 'Invalid shortcut — include a modifier (⌘/⌥/⌃/⇧) plus a key' };
+    // Validate against the CURRENT mode: push-to-talk accepts a bare-modifier
+    // combo (hold ⌘⇧ to talk); toggle needs a registerable modifier+key accelerator.
+    const mode = captureCtrl?.getStatus().mode ?? 'toggle';
+    const valid = mode === 'push-to-talk' ? isValidPushToTalkBinding(hk) : isValidAccelerator(hk);
+    if (!valid) {
+      return {
+        ok: false,
+        error:
+          mode === 'push-to-talk'
+            ? 'Invalid shortcut — use a modifier combo (e.g. ⌘⇧) or a modifier plus a key'
+            : 'Invalid shortcut — include a modifier (⌘/⌥/⌃/⇧) plus a key',
+      };
     }
     if (!captureCtrl) return { ok: false, error: 'Capture unavailable — reopen SigmaVoice' };
     captureCtrl.setHotkey(hk);
@@ -293,53 +318,22 @@ function registerIpc(): void {
     kv ? getStatsSummary(kv) : { totalWords: 0, recordings: 0, avgWpm: 0, recent: [] },
   );
 
-  // --- Whisper model management -------------------------------------------
-  // List the catalog with per-model status (downloaded / downloading / active).
-  ipcMain.handle('bv:listModels', () => {
-    const modelsDir = getModelsDir();
-    const activeId = captureCtrl?.getStatus().modelId;
-    return MODEL_CATALOG.map((m) => ({
-      id: m.id,
-      name: m.name,
-      sizeMb: m.sizeMb,
-      isDefault: m.isDefault,
-      downloaded: isModelDownloaded(m, modelsDir),
-      downloading: isDownloading(m.id),
-      active: m.id === activeId,
-    }));
-  });
-
-  // Download a model; streams progress to the settings window over
-  // 'voice:model-download', resolves when complete (or rejects → caught here).
-  ipcMain.handle('bv:downloadModel', async (_e, id: string) => {
-    const entry = MODEL_CATALOG.find((m) => m.id === id);
-    if (!entry) return { ok: false, error: `Unknown model: ${id}` };
-    // The renderer understands an optional `aborted` terminal flag — a user cancel
-    // is a clean stop, not a failure — so the local emit widens the payload type.
-    const emit = (p: DownloadProgress & { aborted?: boolean }): void => {
+  // Whisper model management (list / download / abort) — src/model-ipc.ts.
+  registerModelIpc(ipcMain, {
+    getModelsDir,
+    getActiveModelId: () => captureCtrl?.getStatus().modelId,
+    send: (channel, payload) => {
       if (settingsWindow && !settingsWindow.isDestroyed()) {
-        settingsWindow.webContents.send('voice:model-download', p);
+        settingsWindow.webContents.send(channel, payload);
       }
-    };
-    try {
-      await downloadModel(entry, getModelsDir(), emit);
-      return { ok: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // A user-initiated cancel rejects with an "abort" message → surface it as a
-      // clean terminal state (row resets, no error toast), not a download failure.
-      if (/abort/i.test(message)) {
-        emit({ modelId: id, bytesDone: 0, bytesTotal: 0, fraction: 0, done: true, aborted: true });
-        return { ok: true, aborted: true };
-      }
-      emit({ modelId: id, bytesDone: 0, bytesTotal: 0, fraction: 0, done: true, error: message });
-      return { ok: false, error: message };
-    }
+    },
   });
 
-  // Abort an in-flight download.
-  ipcMain.handle('bv:abortDownload', (_e, id: string) => {
-    try { abortDownload(id); } catch { /* ignore */ }
+  // Floating pill (FE-2): settings + click/drag IPC — src/pill.ts.
+  registerPillIpc(ipcMain, {
+    kv: () => kv,
+    ctrl: () => captureCtrl,
+    hud: () => hud,
   });
 }
 
@@ -400,6 +394,15 @@ app.whenReady().then(() => {
 
     captureCtrl = buildGlobalCaptureController({
       emit: (event, payload) => {
+        // Swallow the engine's "could not register hotkey" warn for a
+        // bare-modifier push-to-talk binding — our key listener owns it, so the
+        // globalShortcut failure is expected and the warning would mislead.
+        if (
+          event === 'voice:global-capture-toast' &&
+          isExpectedBareModifierRegisterToast(payload)
+        ) {
+          return;
+        }
         // Forward to settings window if open
         if (settingsWindow && !settingsWindow.isDestroyed()) {
           settingsWindow.webContents.send(event, payload);
@@ -417,11 +420,15 @@ app.whenReady().then(() => {
       },
     });
 
-    // Focus-preserving recording HUD overlay (lazily shown on first record).
+    // Focus-preserving recording HUD / floating pill overlay.
     hud = createHudWindow({
       preloadPath: path.join(__dirname, 'hud-preload.cjs'),
       htmlPath: path.join(__dirname, '..', 'renderer', 'hud.html'),
+      ...pillHudDeps(store),
     });
+    // Floating pill (FE-2): when enabled (default ON) keep a resting idle pill on
+    // screen between dictations instead of only flashing during capture.
+    if (isPillEnabled(store)) hud.setPersistent(true);
 
     // True push-to-talk: supply the key-UP edge Electron's globalShortcut lacks.
     // Key-DOWN/start stays on the controller's globalShortcut; on release in
@@ -430,6 +437,7 @@ app.whenReady().then(() => {
     hotkeyMgr = createHotkeyManager({
       getMode: () => captureCtrl?.getStatus().mode ?? 'toggle',
       getHotkey: () => captureCtrl?.getStatus().hotkey ?? '',
+      onPushToTalkPress: () => { void captureCtrl?.startRecording(); },
       onPushToTalkRelease: () => { void captureCtrl?.stopAndTranscribe(); },
       onListenerUnavailable: () => {
         pttListenerUnavailable = true;

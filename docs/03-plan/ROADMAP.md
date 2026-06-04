@@ -14,7 +14,7 @@ This ROADMAP is the single source of truth for what to build next.
 
 ---
 
-## Build status — `main` (updated 2026-06-01; **13 commits ahead of `origin/main`, unpushed**)
+## Build status — `main` (updated 2026-06-04; **16 commits ahead of `origin/main`, unpushed** + branch `feat/hotkey-hold-to-talk`)
 
 Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build`), spec+quality reviewed
 (no regressions). **NOT released** — pending operator **push** + **on-device smoke**:
@@ -28,10 +28,19 @@ Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build
   (`settings.html` → html+css+9 js modules, all <500) + CSP tightened to `script-src 'self'`.
 - ✅ **Phase 3 partial** — **CA-1** test harness (16+4 tests, `node --test` native TS, zero deps) · **SEC-1/2/4/5**
   hardening (CSP, nav lockdown, sandbox, dictionary cap) · **CA-2** (done as part of Phase 1).
+- ✅ **Phase 1.5** (branch `feat/hotkey-hold-to-talk`, 2026-06-04 — see the phase below): modifier **hold-to-talk**
+  PTT + record-shortcut capture UI (symptom b) · always-visible **floating pill** (FE-2 + FE-13, symptom d).
+  Gate-green (`pnpm typecheck` + `pnpm build` + **37 tests**). App-shell only.
+
+> 🔴 **On-device finding (2026-06-04).** The operator's installed app is **v0.3.1** — TWO releases behind `main`.
+> The 4 reported symptoms were root-caused (full writeup: `WISHLIST.md` §Deep review findings): the record-start
+> **crash (c)** and **model-download (a)** are **already fixed on `main`** (ship-only — pin `35a290e`=v0.3.2 + FE-9);
+> **hold-to-talk (b)** and the **floating pill (d)** were genuine gaps, **now built** (Phase 1.5). **The on-device
+> "smoke" caveat below was effectively run on the wrong (old) build** → re-run it after push + release.
 
 **Deferred (need operator input, hardware, or CI):**
 - **FE-4 (clipboard-only)** → engine track (Phase 4): `RouteOpts` has no output-mode hook; needs a `voice-core` change.
-- **Phase 2 (features)** — floating pill, onboarding, history, mic picker, local cleanup: behavioral/visual, real-device.
+- **Phase 2 (features)** — ~~floating pill~~ (✅ done in **Phase 1.5**) · onboarding, history, mic picker, local cleanup: behavioral/visual, real-device.
 - **Phase 3 remainder** — SEC-3 (commit lockfile + `--frozen-lockfile`: changes CI install), SEC-6 (clipboard residue),
   SEC-7 (installer checksum), SEC-8, PF-2/3/5/7.
 - **Phase 4 (engine/native)** — W-SV1 Windows build etc.: needs a Windows CI runner + SigmaLink submodule edits.
@@ -128,12 +137,36 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 2 — Signature features (BridgeVoice parity + beyond) — ⬜ PENDING
+## Phase 1.5 — Hold-to-talk activation + floating pill — ✅ DONE (branch `feat/hotkey-hold-to-talk`; pending merge + release + on-device smoke)
+
+**Goal.** Close the two genuine activation gaps the v0.3.1 on-device test exposed: hold a modifier combo (⌘⇧) to talk, and an always-visible floating pill that click-to-dictates — both without ever stealing keyboard focus from the app you dictate into.
+
+**Deliverables.**
+- `isValidPushToTalkBinding` (`src/accelerator.ts`) — a bare-modifier combo (≥2 modifiers, base key optional) is a valid PTT trigger.
+- Bare-modifier hold-to-talk engine: `resolveModifierKeys` + a pure `createPttHoldMachine` (250 ms hold-delay, misfire-cancel) in `src/hotkey-manager.ts`, owning BOTH key edges via `node-global-key-listener`.
+- A **record-shortcut capture UI** (`renderer/js/hotkey-capture.js`) replacing the raw accelerator text field — press your keys, mode-aware, Esc cancels, keycap preview.
+- An always-visible **floating pill** (FE-2): the HUD made persistent with an `idle` state, single-click-to-dictate + drag-to-move + KV position persistence (`src/hud-window.ts`, pure `src/pill-geometry.ts`, `renderer/hud.html`, two-way `src/hud-preload.ts`).
+- A **pill appearance** toggle (FE-13): Logo & text ↔ Logo only (`renderer/settings.html`, `renderer/js/capture.js`).
+- Tests: extended `accelerator.test.ts` + `hotkey-manager.test.ts`, new `pill-geometry.test.ts` — **37 total** (was 20).
+
+**Why now.** The v0.3.1 on-device test surfaced these as the ONLY two reported symptoms not already fixed-and-unreleased on `main`. Both are app-shell, high perceived value, and the HUD already proved the hard part (a non-activating panel), so they were cheap to land ahead of the broader Phase 2.
+
+**Scope.** Hotkey: `accelerator.ts` (+`isValidPushToTalkBinding`); `hotkey-manager.ts` (`resolveModifierKeys`, `createPttHoldMachine`, listener owns both edges for bare-modifier PTT — the current event is authoritative for its own key); `main.ts:254-262` mode-aware `bv:setHotkey` + `onPushToTalkPress` wiring + suppress the engine's expected "could not register hotkey" warn (`global-capture.ts:372-377`) for bare-modifier PTT bindings. Pill: `hud-window.ts` (idle/persistent/`moveTo`/saved-pos via `pill-geometry.clampToWorkArea`/appearance), `hud-preload.ts` (`toggle`/`move`/`move-end`), `hud.html` (idle visual + single-click toggle + 4 px-threshold drag), `main.ts` pill KV (`voice.pill.*`, enabled default ON) + `hud:*` IPC + `bv:getPillSettings`/`setPillEnabled`/`setPillAppearance`, `preload.ts`, `settings.html` + `capture.js` (Floating pill section).
+
+**Findings + recommendation.** Symptom (b) root cause: the saved hotkey `CommandOrControl+Alt` is modifier-only; Electron `globalShortcut` can't bind a bare modifier, so neither edge fired. Fix: the app-shell key listener owns both edges for bare-modifier PTT (see **ADR-006**), leaving the shared engine untouched. The pill reuses the HUD's focus-preserving panel, so it's a morph (idle↔recording↔transcribing), not a new window — matching BridgeVoice.
+
+**Risks.** (1) Bare-modifier PTT needs macOS **Input Monitoring** — surfaced via the existing degrade warning + an inline Settings hint. (2) Click vs drag on the pill — a 4 px movement threshold disambiguates. (3) Focus-steal — the pill stays `focusable:false`, never calls focus(), and keeps the blur-on-focus guard. (4) The engine still attempts (and fails) `globalShortcut.register` for a bare modifier — its warn toast is suppressed app-shell-side by message-match (fails open). All four need real-device confirmation.
+
+**Definition of done.** ✅ `pnpm typecheck` + `pnpm build` + 37 tests green, committed on `feat/hotkey-hold-to-talk`. ⏳ Operator on-device smoke (after merge + release): holding ⌘⇧ records and releasing transcribes; the capture UI records a chosen shortcut; the floating pill shows at launch, click-to-dictates, drags + persists position, switches Logo/Logo+text, and never pulls focus from the target app.
+
+---
+
+## Phase 2 — Signature features (BridgeVoice parity + beyond) — 🟡 PARTIAL (FE-2 pill ✅ Phase 1.5; rest pending)
 
 **Goal.** SigmaVoice is a daily-driver dictation tool: a persistent floating pill, a guided first run, searchable history, mic selection, and an optional local prompt-cleanup pass.
 
 **Deliverables.**
-- A persistent, draggable **floating dictation pill** (idle / listening / processing), click-to-dictate, position persisted in KV.
+- ~~A persistent, draggable **floating dictation pill** (idle / listening / processing), click-to-dictate, position persisted in KV.~~ → ✅ **done in Phase 1.5** (FE-2 + FE-13).
 - A **first-run onboarding** panel: Mic + Accessibility + Input-Monitoring checklist with live status + deep links.
 - A searchable **transcription history** with per-row "Add to Dictionary".
 - A **mic input-device picker** (preferred + "active now" fallback).
@@ -226,6 +259,11 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 **Context.** The `/roadmap` skill defaults to repo root, but this project already standardizes on `docs/03-plan/` (referenced across HANDOFF/CLAUDE.md/WISHLIST).
 **Consequences.** (+) No doc fragmentation; one discoverable plan tree. (−) Deviates from the skill default — noted here so future agents don't create a duplicate root file.
 
+### ADR-006 — Modifier-only hold-to-talk is owned by the app-shell key listener, not the engine
+**Decision.** A bare-modifier push-to-talk binding (e.g. hold ⌘⇧) is detected and driven entirely by the app-shell `hotkey-manager` via `node-global-key-listener` (BOTH the press and release edges), NOT by the engine's Electron `globalShortcut`. The engine's globalShortcut path is unchanged for toggle + base-key bindings; its expected "could not register" warn for a bare modifier is filtered out app-shell-side.
+**Context.** Electron `globalShortcut` cannot register a modifier-only accelerator (symptom b: "hold ⌘⇧ did nothing"). The key listener already supplied the PTT key-UP edge; extending it to also own key-DOWN (behind a hold-delay) keeps the fix in the app shell and off the shared SigmaLink engine.
+**Consequences.** (+) No engine/submodule change; the whole PTT lifecycle lives in one app-shell module; enables BridgeVoice-style "hold a modifier to talk". (−) Requires macOS Input Monitoring (a global key hook). (−) The engine still attempts (and fails) the globalShortcut register; its warn is suppressed by matching the message string (fails open if the wording changes). The clean long-term fix is an **engine flag to skip globalShortcut for app-owned bindings** — tracked in WISHLIST.
+
 ---
 
 ## Effort / impact table
@@ -237,7 +275,8 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 | Apple-grade restyle (light/vibrancy/cards/dashboard) | 1 | L | High | The whole face of the product |
 | WPM/Sessions/Overview dashboard | 1 | S | Medium | Engine already aggregates stats |
 | Honest HUD animation + states | 1 | M | Medium | App-shell now; real level via ENG-5 |
-| Floating dictation pill | 2 | L | High | BridgeVoice signature; HUD proves the pattern |
+| Modifier hold-to-talk PTT + capture UI | 1.5 | M | High | ✅ done (branch); symptom (b) |
+| Floating dictation pill (FE-2 + FE-13) | 1.5 | L | High | ✅ done (branch); symptom (d); HUD proves the pattern |
 | First-run onboarding + permissions | 2 | L | High | Highest value under Gatekeeper friction |
 | History + dictionary recipes + mic picker | 2 | M–L | Medium | Tightens the dictation loop |
 | Local prompt-cleanup pass | 2 | M | Medium | Opt-in/local only (ADR-002) |

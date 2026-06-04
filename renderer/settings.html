@@ -180,19 +180,6 @@
           <div id="model-list" aria-live="polite"><!-- injected by JS --></div>
         </div>
 
-        <p class="section-header">Hotkey</p>
-        <div class="card">
-          <div class="row">
-            <div class="row-label">Global shortcut</div>
-            <input id="hotkey-input" class="input-field" type="text"
-                   placeholder="CommandOrControl+Alt+Space"
-                   aria-label="Global hotkey shortcut" />
-          </div>
-          <div class="row flex-end">
-            <button id="hotkey-save-btn" class="btn btn-primary">Apply</button>
-          </div>
-        </div>
-
         <p class="section-header">Activation</p>
         <div class="card">
           <div class="row">
@@ -203,6 +190,47 @@
             <div class="seg-control" role="group" aria-label="Capture mode">
               <button class="seg-btn" id="mode-toggle-btn" aria-pressed="true" data-mode="toggle">Toggle</button>
               <button class="seg-btn" id="mode-ptt-btn" aria-pressed="false" data-mode="push-to-talk">Push-to-talk</button>
+            </div>
+          </div>
+        </div>
+
+        <p class="section-header">Hotkey</p>
+        <div class="card">
+          <div class="row row-top">
+            <div>
+              <div class="row-label">Global shortcut</div>
+              <div class="row-sublabel" id="hotkey-hint">Press a shortcut — a modifier plus a key (e.g. ⌘⌥Space).</div>
+            </div>
+            <button id="hotkey-capture-btn" class="btn btn-ghost hotkey-capture"
+                    aria-label="Set global shortcut — click, then press your keys" aria-pressed="false">
+              <span id="hotkey-keycaps" class="kbd-row"></span>
+            </button>
+          </div>
+          <p class="row-sublabel hotkey-im-note" id="hotkey-im-note" hidden>
+            Hold-to-talk needs Input Monitoring (System Settings → Privacy &amp; Security → Input Monitoring).
+          </p>
+        </div>
+
+        <p class="section-header">Floating pill</p>
+        <div class="card">
+          <div class="row">
+            <div>
+              <div class="row-label">Show floating pill</div>
+              <div class="row-sublabel">An always-visible pill — click to dictate, drag to move.</div>
+            </div>
+            <label class="toggle" aria-label="Show floating pill">
+              <input type="checkbox" id="pill-enabled-toggle" role="switch" aria-checked="false" />
+              <span class="toggle-track"></span>
+            </label>
+          </div>
+          <div class="row" id="pill-appearance-row">
+            <div>
+              <div class="row-label">Appearance</div>
+              <div class="row-sublabel">Logo with the SigmaVoice name, or just the logo.</div>
+            </div>
+            <div class="seg-control" role="group" aria-label="Pill appearance">
+              <button class="seg-btn" id="pill-appearance-full" aria-pressed="true" data-appearance="full">Logo &amp; text</button>
+              <button class="seg-btn" id="pill-appearance-compact" aria-pressed="false" data-appearance="compact">Logo only</button>
             </div>
           </div>
         </div>

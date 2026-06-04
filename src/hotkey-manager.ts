@@ -37,6 +37,7 @@ import type {
   GlobalKeyboardListener,
   IGlobalKey,
   IGlobalKeyEvent,
+  IGlobalKeyDownMap,
 } from 'node-global-key-listener';
 
 // ---------------------------------------------------------------------------
@@ -50,6 +51,12 @@ export interface HotkeyManagerDeps {
   getHotkey: () => string;
   /** Wired by the lead to `controller.stopAndTranscribe()`. */
   onPushToTalkRelease: () => void;
+  /**
+   * Wired by the lead to `controller.startRecording()`. Used for bare-modifier
+   * hold-to-talk, where Electron's globalShortcut can't bind the trigger so this
+   * module owns the press edge too (toggle + base-key PTT don't use it).
+   */
+  onPushToTalkPress: () => void;
   /**
    * Called once when the global key-UP listener cannot attach (e.g. macOS
    * Input Monitoring not granted, or unsupported platform). The lead uses this
@@ -158,26 +165,200 @@ export function resolveMainKey(accelerator: string): IGlobalKey | null {
 }
 
 // ---------------------------------------------------------------------------
+// Bare-modifier hold-to-talk (e.g. hold ⌘⇧ to talk)
+// ---------------------------------------------------------------------------
+//
+// Electron's globalShortcut cannot bind a modifier-only accelerator, so for a
+// bare-modifier push-to-talk binding THIS module owns BOTH edges: it watches the
+// global key stream, and when every required modifier is held — and no other key
+// joins, so ⌘⇧3 doesn't count — for a short hold delay it starts recording;
+// releasing any required modifier stops + transcribes.
+
+/** node-global-key-listener key names that satisfy each Electron modifier. */
+function modifierGroup(token: string, platform: NodeJS.Platform): IGlobalKey[] | null {
+  switch (token) {
+    case 'command': case 'cmd': case 'super': case 'meta':
+      return ['LEFT META', 'RIGHT META'];
+    case 'commandorcontrol': case 'cmdorctrl':
+      return platform === 'darwin'
+        ? ['LEFT META', 'RIGHT META']
+        : ['LEFT CTRL', 'RIGHT CTRL'];
+    case 'control': case 'ctrl':
+      return ['LEFT CTRL', 'RIGHT CTRL'];
+    case 'alt': case 'option': case 'altgr':
+      return ['LEFT ALT', 'RIGHT ALT'];
+    case 'shift':
+      return ['LEFT SHIFT', 'RIGHT SHIFT'];
+    default:
+      return null;
+  }
+}
+
+/**
+ * For a bare-modifier accelerator (>=2 modifiers, NO base key) return the list
+ * of required modifier groups — each group is the set of IGlobalKey names that
+ * satisfy that modifier (left/right variants). Returns null if the accelerator
+ * has a base key, fewer than 2 modifiers, or an unknown token (those go through
+ * the base-key `resolveMainKey` path instead).
+ */
+export function resolveModifierKeys(
+  accelerator: string,
+  platform: NodeJS.Platform = process.platform,
+): IGlobalKey[][] | null {
+  if (!accelerator) return null;
+  const tokens = accelerator
+    .split('+')
+    .map((t) => t.trim())
+    .filter((t) => t.length > 0);
+  if (tokens.length < 2) return null;
+  const groups: IGlobalKey[][] = [];
+  for (const token of tokens) {
+    const group = modifierGroup(token.toLowerCase(), platform);
+    if (!group) return null; // a non-modifier token → not a bare-modifier binding
+    groups.push(group);
+  }
+  return groups;
+}
+
+/** IGlobalKey names that count as modifiers (so we can tell when a *non*-modifier
+ *  key joins the held combo and turns it into a real shortcut). */
+const MODIFIER_KEY_NAMES: ReadonlySet<string> = new Set<IGlobalKey>([
+  'LEFT META', 'RIGHT META', 'LEFT CTRL', 'RIGHT CTRL',
+  'LEFT ALT', 'RIGHT ALT', 'LEFT SHIFT', 'RIGHT SHIFT', 'FN',
+]);
+
+/** True if `name` is a modifier key (not a "real" key like a letter/number). */
+export function isModifierKeyName(name: string): boolean {
+  return MODIFIER_KEY_NAMES.has(name);
+}
+
+export interface PttHoldMachine {
+  /** Feed a snapshot computed from a key event + the live key-down map. */
+  update(snapshot: { allModsHeld: boolean; otherKeyDown: boolean }): void;
+  /** Force back to idle, stopping an in-progress recording. */
+  reset(): void;
+}
+
+/**
+ * Pure hold-delay state machine for bare-modifier push-to-talk. Timer + start/
+ * stop are injected so it is fully testable without real timers or the listener.
+ *
+ *   idle --(all mods held, no other key)--> armed --(delay elapsed)--> recording
+ *   armed --(other key joins | a mod released)--> idle  (cancel; never started)
+ *   recording --(a mod released)--> idle  (stop + transcribe)
+ */
+export function createPttHoldMachine(opts: {
+  holdDelayMs: number;
+  onStart: () => void;
+  onStop: () => void;
+  schedule: (cb: () => void, delayMs: number) => unknown;
+  cancel: (handle: unknown) => void;
+}): PttHoldMachine {
+  let state: 'idle' | 'armed' | 'recording' = 'idle';
+  let handle: unknown = null;
+
+  function clearTimer(): void {
+    if (handle != null) {
+      opts.cancel(handle);
+      handle = null;
+    }
+  }
+
+  function update(s: { allModsHeld: boolean; otherKeyDown: boolean }): void {
+    if (!s.allModsHeld) {
+      if (state === 'armed') { clearTimer(); state = 'idle'; }
+      else if (state === 'recording') { state = 'idle'; opts.onStop(); }
+      return;
+    }
+    // Every required modifier is held.
+    if (s.otherKeyDown) {
+      // A non-modifier key joined the combo → it's a real shortcut, never PTT.
+      if (state === 'armed') { clearTimer(); state = 'idle'; }
+      return;
+    }
+    if (state === 'idle') {
+      state = 'armed';
+      handle = opts.schedule(() => {
+        handle = null;
+        if (state === 'armed') { state = 'recording'; opts.onStart(); }
+      }, opts.holdDelayMs);
+    }
+  }
+
+  function reset(): void {
+    clearTimer();
+    if (state === 'recording') opts.onStop();
+    state = 'idle';
+  }
+
+  return { update, reset };
+}
+
+/** Hold a bare-modifier combo this long (ms) before it counts as hold-to-talk —
+ *  long enough that a quick combo shortcut (⌘⇧3) doesn't trigger dictation. */
+const HOLD_DELAY_MS = 250;
+
+// ---------------------------------------------------------------------------
 // Factory
 // ---------------------------------------------------------------------------
 
 export function createHotkeyManager(deps: HotkeyManagerDeps): HotkeyManager {
   let listener: GlobalKeyboardListener | null = null;
   // The bound listener callback — kept so we can removeListener on stop().
-  let onKey: ((e: IGlobalKeyEvent) => void) | null = null;
+  let onKey: ((e: IGlobalKeyEvent, down: IGlobalKeyDownMap) => void) | null = null;
   // Guards against re-entrant start() while the async load is in flight.
   let starting = false;
 
-  function handleKey(event: IGlobalKeyEvent): void {
-    // We only care about the release edge.
-    if (event.state !== 'UP') return;
-    // Read mode live — toggle mode is fully owned by the controller.
-    if (deps.getMode() !== 'push-to-talk') return;
+  // Hold-delay state machine for bare-modifier hold-to-talk (e.g. hold ⌘⇧ to
+  // talk). Electron's globalShortcut can't bind a bare-modifier trigger, so for
+  // that binding this module owns BOTH the press and release edges.
+  const holdMachine = createPttHoldMachine({
+    holdDelayMs: HOLD_DELAY_MS,
+    onStart: () => {
+      try { deps.onPushToTalkPress(); }
+      catch (err) { console.warn('[hotkey-manager] onPushToTalkPress threw:', err); }
+    },
+    onStop: () => {
+      try { deps.onPushToTalkRelease(); }
+      catch (err) { console.warn('[hotkey-manager] onPushToTalkRelease threw:', err); }
+    },
+    schedule: (cb, delayMs) => setTimeout(cb, delayMs),
+    cancel: (h) => clearTimeout(h as ReturnType<typeof setTimeout>),
+  });
 
-    const mainKey = resolveMainKey(deps.getHotkey());
+  function handleKey(event: IGlobalKeyEvent, down: IGlobalKeyDownMap): void {
+    // Toggle mode is fully owned by the controller's globalShortcut.
+    if (deps.getMode() !== 'push-to-talk') { holdMachine.reset(); return; }
+
+    const hotkey = deps.getHotkey();
+    const modGroups = resolveModifierKeys(hotkey);
+
+    // Bare-modifier hold-to-talk: own both edges via the hold machine. A required
+    // modifier is satisfied if EITHER its left/right variant is currently down.
+    if (modGroups) {
+      // The current event is authoritative for its OWN key (the listener's
+      // down-map may or may not reflect this event yet); trust the map for every
+      // other key. This makes both the completing DOWN and the breaking UP
+      // detect correctly regardless of the library's update ordering.
+      const isHeld = (k: IGlobalKey): boolean =>
+        event.name === k ? event.state === 'DOWN' : down[k] === true;
+      const allModsHeld = modGroups.every((group) => group.some(isHeld));
+      // A DOWN for anything that is NOT a known modifier (incl. an unrecognized
+      // key with no name) means a real shortcut is forming — not hold-to-talk.
+      const otherKeyDown =
+        event.state === 'DOWN' && !(event.name != null && isModifierKeyName(event.name));
+      holdMachine.update({ allModsHeld, otherKeyDown });
+      return;
+    }
+
+    // Base-key binding: the controller owns key-DOWN/start; we only supply the
+    // missing key-UP/stop edge. Clear any state left from a prior bare-modifier
+    // binding first (mode/hotkey are read live, so the binding can change).
+    holdMachine.reset();
+    if (event.state !== 'UP') return;
+    const mainKey = resolveMainKey(hotkey);
     if (mainKey === null) return;
     if (event.name !== mainKey) return;
-
     try {
       deps.onPushToTalkRelease();
     } catch (err) {
@@ -200,8 +381,10 @@ export function createHotkeyManager(deps: HotkeyManagerDeps): HotkeyManager {
         gkl = new mod.GlobalKeyboardListener();
         onKey = handleKey;
         // Resolves once the key server has spawned. listen-only (returns void).
-        await gkl.addListener((event) => {
-          onKey?.(event);
+        // The second arg is the live key-down map — needed to tell whether ALL
+        // required modifiers are held for bare-modifier hold-to-talk.
+        await gkl.addListener((event, down) => {
+          onKey?.(event, down);
         });
         listener = gkl;
       } catch (err) {

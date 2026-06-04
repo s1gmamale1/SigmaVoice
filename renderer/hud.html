@@ -241,6 +241,25 @@
     /* In transcribing, the timer is frozen; dim it + show a label cue. */
     .pill[data-state="transcribing"] .timer { color: #aeaeb2; }
 
+    /* === IDLE: resting floating pill (mic glyph + optional wordmark) === */
+    .mic { display: none; flex: 0 0 auto; }
+    .wordmark {
+      display: none; flex: 1 1 auto; font-size: 13px; font-weight: 600;
+      letter-spacing: 0.2px; color: #f2f2f7; white-space: nowrap;
+    }
+    .pill[data-state="idle"] .dot,
+    .pill[data-state="idle"] .spinner,
+    .pill[data-state="idle"] .wave,
+    .pill[data-state="idle"] .timer,
+    .pill[data-state="idle"] .label { display: none; }
+    .pill[data-state="idle"] .mic { display: block; color: #f2f2f7; }
+    .pill[data-state="idle"].appearance-full .wordmark { display: block; }
+    /* Compact idle: center just the mic glyph. */
+    .pill.appearance-compact[data-state="idle"] { justify-content: center; }
+    /* The pill is interactive (click-to-dictate / drag) — show it. */
+    .pill { cursor: pointer; }
+    .pill.dragging { cursor: grabbing; }
+
     /* --- reduced motion: kill all animation, keep states legible --- */
     @media (prefers-reduced-motion: reduce) {
       .pill { animation: none; }
@@ -253,15 +272,22 @@
   </style>
 </head>
 <body>
-  <!-- Default markup renders the 'recording' state so the HUD is visible even
-       if no preload / no state event ever arrives (fail-visible). -->
-  <div class="pill" id="pill" data-state="recording" role="status">
+  <!-- Default markup renders the 'idle' resting pill so it's visible at launch
+       even before the first state event arrives (fail-visible). -->
+  <div class="pill appearance-full" id="pill" data-state="idle" role="status">
     <div class="indicator">
       <div class="dot" aria-hidden="true"></div>
       <div class="spinner" aria-hidden="true"></div>
       <!-- ⚠ in 'error', ✓ in 'done'; CSS picks which (if any) is shown. -->
       <span class="glyph" id="glyph" aria-hidden="true">&#9888;</span>
+      <!-- idle: a calm mic glyph (the resting floating-pill state). -->
+      <svg class="mic" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+        <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3z" />
+        <path d="M17 11a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2z" />
+      </svg>
     </div>
+    <!-- idle wordmark (shown only in the 'full' appearance). -->
+    <div class="wordmark" id="wordmark" aria-hidden="true">SigmaVoice</div>
     <!-- HONEST 'listening' glyph: a calm breathing waveform, NOT a level meter. -->
     <div class="wave" aria-hidden="true">
       <svg viewBox="0 0 64 16" preserveAspectRatio="none" role="presentation">
@@ -272,7 +298,7 @@
     <div class="label" id="label" aria-hidden="true"></div>
     <div class="timer" id="timer" aria-label="Elapsed time">00:00</div>
     <!-- Live region: applyState() sets textContent per state for screen readers. -->
-    <span class="sr-only" id="srStatus" aria-live="polite">Recording</span>
+    <span class="sr-only" id="srStatus" aria-live="polite">SigmaVoice</span>
   </div>
 
   <script type="module">
@@ -287,10 +313,11 @@
     // something useful.
     // -----------------------------------------------------------------------
 
-    const STATES = ['recording', 'transcribing', 'error', 'no-input', 'done'];
+    const STATES = ['idle', 'recording', 'transcribing', 'error', 'no-input', 'done'];
 
     // Screen-reader announcement per state (matches the visual semantics).
     const SR_LABEL = {
+      'idle': 'SigmaVoice — click to dictate',
       'recording': 'Recording',
       'transcribing': 'Transcribing…',
       'error': 'Mic unavailable',
@@ -346,15 +373,23 @@
       // Leave the last value displayed (frozen) — do NOT reset to 00:00.
     }
 
-    function applyState(state) {
+    function applyState(state, appearance) {
       if (!STATES.includes(state)) return;
-      // Un-hide if a prior click-to-dismiss hid the pill locally.
       pill.style.display = '';
       pill.setAttribute('data-state', state);
+      // Appearance: 'compact' = logo only, 'full' (default) = logo + wordmark.
+      const compact = appearance === 'compact';
+      pill.classList.toggle('appearance-compact', compact);
+      pill.classList.toggle('appearance-full', !compact);
       // Always announce the new state to screen readers (visuals are aria-hidden).
       srStatus.textContent = SR_LABEL[state];
 
       switch (state) {
+        case 'idle':
+          // Resting floating pill: no timer, no capture indicators.
+          labelEl.textContent = '';
+          stopTimer();
+          break;
         case 'recording':
           // Live recording: run the elapsed timer; honest breathing waveform.
           labelEl.textContent = '';
@@ -384,14 +419,41 @@
       }
     }
 
-    // Click-to-dismiss. The preload bridge is one-way (state in only — "the HUD
-    // never talks back"), so we can't tell main to hide the window without adding
-    // an IPC channel. As a minimal local fallback, hide the pill DOM and stop the
-    // timer; the BrowserWindow stays alive (focusable:false, so clicking it never
-    // steals focus from the user's target app) and a later state event re-shows it.
-    pill.addEventListener('click', () => {
-      stopTimer();
-      pill.style.display = 'none';
+    // Click-to-dictate + drag-to-move (floating pill). The window is
+    // focusable:false, so these mouse interactions NEVER steal keyboard focus
+    // from the app you're dictating into. A small movement threshold tells a
+    // click (toggle dictation) apart from a drag (reposition + persist). Because
+    // the window follows the cursor, the grab offset (clientX/Y) stays constant,
+    // so the new top-left is simply screen − grab.
+    const DRAG_THRESHOLD = 4;
+    let pressing = false, dragging = false;
+    let grabX = 0, grabY = 0, downScreenX = 0, downScreenY = 0;
+
+    pill.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      pressing = true; dragging = false;
+      grabX = e.clientX; grabY = e.clientY;
+      downScreenX = e.screenX; downScreenY = e.screenY;
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!pressing) return;
+      const dx = e.screenX - downScreenX, dy = e.screenY - downScreenY;
+      if (!dragging && Math.hypot(dx, dy) > DRAG_THRESHOLD) {
+        dragging = true;
+        pill.classList.add('dragging');
+      }
+      if (dragging) window.sigmaHud?.move(e.screenX - grabX, e.screenY - grabY);
+    });
+    window.addEventListener('mouseup', (e) => {
+      if (!pressing) return;
+      pressing = false;
+      if (dragging) {
+        dragging = false;
+        pill.classList.remove('dragging');
+        window.sigmaHud?.moveEnd(e.screenX - grabX, e.screenY - grabY);
+      } else {
+        window.sigmaHud?.toggle();
+      }
     });
 
     // When the BrowserWindow is hidden (e.g. recording → idle, which sends no
@@ -406,7 +468,7 @@
     if (hud && typeof hud.onState === 'function') {
       hud.onState((payload) => {
         if (payload && STATES.includes(payload.state)) {
-          applyState(payload.state);
+          applyState(payload.state, payload.appearance);
         }
       });
     } else {

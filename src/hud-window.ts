@@ -32,19 +32,20 @@
 //        it were somehow ordered key.
 
 import { BrowserWindow, screen } from 'electron';
+import { clampToWorkArea } from './pill-geometry';
 
 /**
  * State pushed to the renderer over the `hud:state` channel.
  *
- * 'recording' and 'transcribing' are driven today by the capture controller
- * (showRecording/showTranscribing). The remaining three are render-ready for
- * future engine signals — the renderer paints them via the `data-state`
- * attribute, but no controller method emits them yet:
+ * 'idle' is the resting floating-pill state (persistent mode). 'recording' and
+ * 'transcribing' are driven by the capture controller. The remaining three are
+ * render-ready for future engine signals — the renderer paints them via the
+ * `data-state` attribute, but no controller method emits them yet:
  *   - 'error'    — the mic / input device is unavailable.
  *   - 'no-input' — capture started but no audio is arriving.
  *   - 'done'     — a brief success flash before the overlay hides.
  */
-export type HudState = 'recording' | 'transcribing' | 'error' | 'no-input' | 'done';
+export type HudState = 'idle' | 'recording' | 'transcribing' | 'error' | 'no-input' | 'done';
 
 /** Controller the lead drives from main.ts to show/hide the overlay. */
 export interface HudController {
@@ -52,6 +53,18 @@ export interface HudController {
   showRecording(): void;
   /** Switch overlay to 'transcribing' state (renderer freezes its timer). */
   showTranscribing(): void;
+  /**
+   * Persistent (floating-pill) mode. When true, hide() and the safety timeouts
+   * return the pill to its idle state instead of hiding the window, so it stays
+   * on screen between dictations.
+   */
+  setPersistent(on: boolean): void;
+  /** Move the window's top-left (used by click-drag). */
+  moveTo(x: number, y: number): void;
+  /** Current window top-left, or null if there is no window. */
+  getPosition(): { x: number; y: number } | null;
+  /** Re-push the current state + appearance to the renderer. */
+  refreshAppearance(): void;
   /** Hide the overlay (window is kept alive for fast re-show). */
   hide(): void;
   /** Tear down the window entirely. */
@@ -63,6 +76,10 @@ export interface HudWindowDeps {
   preloadPath: string;
   /** Absolute path to the HUD renderer HTML (renderer/hud.html). */
   htmlPath: string;
+  /** Saved pill top-left (from KV) for persistent mode; null → default bottom-center. */
+  getSavedPosition?: () => { x: number; y: number } | null;
+  /** Pill appearance: 'full' = logo + wordmark, 'compact' = logo only. */
+  getAppearance?: () => 'full' | 'compact';
 }
 
 // Overlay geometry. Small pill, bottom-center of the primary display's work area.
@@ -93,6 +110,10 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
   let ready = false;
   let pendingState: HudState | null = null;
   let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+  // Persistent floating-pill mode: hide()/safety timers return to idle instead
+  // of hiding the window, so the pill stays on screen between dictations.
+  let persistent = false;
+  let currentState: HudState = 'idle';
 
   function clearSafetyTimer(): void {
     if (safetyTimer) {
@@ -102,11 +123,16 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
   }
 
   function computeBounds(): { x: number; y: number; width: number; height: number } {
-    // Bottom-center of the primary display's WORK AREA (excludes menu bar / Dock).
-    const primary = screen.getPrimaryDisplay();
-    const { x: waX, y: waY, width: waW, height: waH } = primary.workArea;
-    const x = Math.round(waX + (waW - HUD_WIDTH) / 2);
-    const y = Math.round(waY + waH - HUD_HEIGHT - HUD_MARGIN_BOTTOM);
+    const wa = screen.getPrimaryDisplay().workArea;
+    // Persistent pill: restore the saved position (clamped back on-screen in case
+    // a display was disconnected). Otherwise default to bottom-center.
+    const saved = deps.getSavedPosition?.() ?? null;
+    if (saved) {
+      const { x, y } = clampToWorkArea(saved, { width: HUD_WIDTH, height: HUD_HEIGHT }, wa);
+      return { x, y, width: HUD_WIDTH, height: HUD_HEIGHT };
+    }
+    const x = Math.round(wa.x + (wa.width - HUD_WIDTH) / 2);
+    const y = Math.round(wa.y + wa.height - HUD_HEIGHT - HUD_MARGIN_BOTTOM);
     return { x, y, width: HUD_WIDTH, height: HUD_HEIGHT };
   }
 
@@ -191,26 +217,39 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
   }
 
   function sendState(state: HudState): void {
+    currentState = state;
     if (!win || win.isDestroyed()) return;
     if (!ready) {
       // Renderer not loaded yet — buffer the latest state; flushed on load.
       pendingState = state;
       return;
     }
-    win.webContents.send('hud:state', { state });
+    const appearance = deps.getAppearance?.() ?? 'full';
+    win.webContents.send('hud:state', { state, appearance });
   }
 
   /** Show WITHOUT activating. Never call show()/focus(). */
   function showInactive(): void {
     const w = ensureWindow();
-    // Re-assert position in case displays changed since the window was created.
-    w.setBounds(computeBounds());
+    // Transient HUD re-centers on each show; the persistent pill preserves the
+    // user's dragged position (set once at creation via computeBounds()).
+    if (!persistent) w.setBounds(computeBounds());
     if (!w.isVisible()) {
       w.showInactive(); // <- the key call: order front but do NOT make key/active
     }
   }
 
+  /** Show the resting idle pill (persistent mode) — no auto-hide. */
+  function goIdle(): void {
+    showInactive();
+    sendState('idle');
+    clearSafetyTimer();
+  }
+
   function doHide(): void {
+    // Persistent (pill) mode: "hide" means return to the resting idle pill —
+    // the floating pill must stay on screen between dictations.
+    if (persistent) { goIdle(); return; }
     clearSafetyTimer();
     if (win && !win.isDestroyed() && win.isVisible()) {
       win.hide();
@@ -237,6 +276,32 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
       // missed event can't pin the overlay permanently.
       clearSafetyTimer();
       safetyTimer = setTimeout(doHide, TRANSCRIBE_SAFETY_MS);
+    },
+    setPersistent(on: boolean): void {
+      persistent = on;
+      // Show the resting pill now, unless a capture is already on screen.
+      if (on && currentState !== 'recording' && currentState !== 'transcribing') {
+        goIdle();
+      } else if (!on && currentState === 'idle') {
+        // Leaving pill mode while resting → hide the overlay.
+        if (win && !win.isDestroyed() && win.isVisible()) win.hide();
+      }
+    },
+    moveTo(x: number, y: number): void {
+      if (!win || win.isDestroyed()) return;
+      // Keep the pill on-screen: clamp to the work area of the display nearest the
+      // target point (multi-display safe) so a drag can't strand it off every display.
+      const wa = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+      const c = clampToWorkArea({ x, y }, { width: HUD_WIDTH, height: HUD_HEIGHT }, wa);
+      win.setBounds({ x: c.x, y: c.y, width: HUD_WIDTH, height: HUD_HEIGHT });
+    },
+    getPosition(): { x: number; y: number } | null {
+      if (!win || win.isDestroyed()) return null;
+      const b = win.getBounds();
+      return { x: b.x, y: b.y };
+    },
+    refreshAppearance(): void {
+      sendState(currentState);
     },
     hide(): void {
       doHide();

@@ -211,6 +211,18 @@ body {
 }
 .kbd-none { font-size: 12px; color: var(--label-tertiary); }
 
+/* ── Hotkey capture button ──────────────────────────────────── */
+.hotkey-capture {
+  min-width: 132px; min-height: 34px; gap: var(--s-1); padding: 6px 10px;
+  background: var(--fill-primary); color: var(--label-primary);
+  border: 1px solid var(--divider); border-radius: var(--r-md);
+}
+.hotkey-capture:hover { background: var(--fill-secondary); opacity: 1; }
+.hotkey-capture.capturing {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.hotkey-im-note { margin: var(--s-2) 0 0; }
+
 /* ── State badge ────────────────────────────────────────────── */
 .state-badge {
   display: inline-flex; align-items: center; gap: 5px;
