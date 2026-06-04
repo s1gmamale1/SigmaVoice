@@ -37,12 +37,12 @@ import {
   getDownloadedModelPath,
   WHISPER_SAMPLE_RATE,
 } from '@sigmalink/voice-core';
-import { isValidAccelerator } from './accelerator';
+import { isValidAccelerator, isValidPushToTalkBinding } from './accelerator';
 import { formatAccelerator } from './keycaps';
 import { createFileKv, type KvStore } from './kv-store';
 import { getDictionary, setDictionary, getStatsSummary } from './settings-data';
 import { createHudWindow, type HudController } from './hud-window';
-import { createHotkeyManager, type HotkeyManager } from './hotkey-manager';
+import { createHotkeyManager, resolveModifierKeys, type HotkeyManager } from './hotkey-manager';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -105,6 +105,22 @@ function warnPushToTalkDegraded(): void {
       level: 'warn',
     });
   }
+}
+
+/**
+ * The engine binds every hotkey via Electron `globalShortcut`, which CANNOT
+ * register a bare-modifier accelerator and emits a "Could not register hotkey …"
+ * warn toast when it fails. For a bare-modifier push-to-talk binding that failure
+ * is expected and harmless — our hotkey-manager owns that trigger directly — so
+ * we swallow that one toast app-shell-side instead of telling the user the
+ * shortcut is broken when it actually works. (Clean fix = an engine flag to skip
+ * globalShortcut for app-owned bindings; matching the message keeps this
+ * app-shell-only. Fails open: if the engine wording changes the toast reappears.)
+ */
+function isExpectedBareModifierRegisterToast(payload: unknown): boolean {
+  const msg = (payload as { message?: string } | null)?.message ?? '';
+  const m = /could not register hotkey (.+?)\./i.exec(msg);
+  return m != null && resolveModifierKeys(m[1]) !== null;
 }
 
 /** Drive the HUD overlay from capture-state changes. */
@@ -253,8 +269,18 @@ function registerIpc(): void {
   // accelerator instead of us silently dropping it.
   ipcMain.handle('bv:setHotkey', (_e, hotkey: string): { ok: boolean; error?: string } => {
     const hk = typeof hotkey === 'string' ? hotkey.trim() : '';
-    if (!isValidAccelerator(hk)) {
-      return { ok: false, error: 'Invalid shortcut — include a modifier (⌘/⌥/⌃/⇧) plus a key' };
+    // Validate against the CURRENT mode: push-to-talk accepts a bare-modifier
+    // combo (hold ⌘⇧ to talk); toggle needs a registerable modifier+key accelerator.
+    const mode = captureCtrl?.getStatus().mode ?? 'toggle';
+    const valid = mode === 'push-to-talk' ? isValidPushToTalkBinding(hk) : isValidAccelerator(hk);
+    if (!valid) {
+      return {
+        ok: false,
+        error:
+          mode === 'push-to-talk'
+            ? 'Invalid shortcut — use a modifier combo (e.g. ⌘⇧) or a modifier plus a key'
+            : 'Invalid shortcut — include a modifier (⌘/⌥/⌃/⇧) plus a key',
+      };
     }
     if (!captureCtrl) return { ok: false, error: 'Capture unavailable — reopen SigmaVoice' };
     captureCtrl.setHotkey(hk);
@@ -400,6 +426,15 @@ app.whenReady().then(() => {
 
     captureCtrl = buildGlobalCaptureController({
       emit: (event, payload) => {
+        // Swallow the engine's "could not register hotkey" warn for a
+        // bare-modifier push-to-talk binding — our key listener owns it, so the
+        // globalShortcut failure is expected and the warning would mislead.
+        if (
+          event === 'voice:global-capture-toast' &&
+          isExpectedBareModifierRegisterToast(payload)
+        ) {
+          return;
+        }
         // Forward to settings window if open
         if (settingsWindow && !settingsWindow.isDestroyed()) {
           settingsWindow.webContents.send(event, payload);
@@ -430,6 +465,7 @@ app.whenReady().then(() => {
     hotkeyMgr = createHotkeyManager({
       getMode: () => captureCtrl?.getStatus().mode ?? 'toggle',
       getHotkey: () => captureCtrl?.getStatus().hotkey ?? '',
+      onPushToTalkPress: () => { void captureCtrl?.startRecording(); },
       onPushToTalkRelease: () => { void captureCtrl?.stopAndTranscribe(); },
       onListenerUnavailable: () => {
         pttListenerUnavailable = true;

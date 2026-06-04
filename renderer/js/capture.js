@@ -8,15 +8,23 @@
 
 import { bv, hasMethod, safeCall } from './settings.js';
 import { showToast } from './toast.js';
+import { initHotkeyCapture } from './hotkey-capture.js';
+import { formatAccelerator } from './keycaps.js';
+
+// Live capture mode — read by the hotkey capture control so push-to-talk can
+// accept a bare-modifier combo while toggle requires a base key.
+let currentMode = 'toggle';
+let hotkeyCapture = null;
 
 // --- Mode segmented control ------------------------------------------------
 
-/** Reflect a capture mode into the segmented control + sublabel. */
+/** Reflect a capture mode into the segmented control, sublabel + hotkey hints. */
 export function applyMode(mode) {
+  currentMode = mode === 'push-to-talk' ? 'push-to-talk' : 'toggle';
   const toggleBtn = document.getElementById('mode-toggle-btn');
   const pttBtn = document.getElementById('mode-ptt-btn');
   const sublabel = document.getElementById('mode-sublabel');
-  const isToggle = mode === 'toggle';
+  const isToggle = currentMode === 'toggle';
   toggleBtn?.setAttribute('aria-pressed', String(isToggle));
   pttBtn?.setAttribute('aria-pressed', String(!isToggle));
   if (sublabel) {
@@ -24,18 +32,23 @@ export function applyMode(mode) {
       ? 'Tap hotkey to start/stop'
       : 'Hold hotkey while speaking';
   }
+  // The Input-Monitoring note + the resting hotkey hint only matter for PTT.
+  const imNote = document.getElementById('hotkey-im-note');
+  if (imNote) imNote.hidden = isToggle;
+  const hint = document.getElementById('hotkey-hint');
+  if (hint) {
+    hint.textContent = isToggle
+      ? 'Press a shortcut — a modifier plus a key (e.g. ⌘⌥Space).'
+      : 'Hold the keys you want to push-to-talk with (e.g. ⌘⇧), then release.';
+  }
 }
 
 /** Reflect the latest status onto the Capture surfaces (hotkey + mode). */
 export function applyCaptureStatus(status) {
   if (!status) return;
-  if (status.hotkey !== undefined) {
-    const input = document.getElementById('hotkey-input');
-    // Don't clobber the field while the user is mid-edit (a live state event
-    // must not wipe an unsaved shortcut they're typing).
-    if (input && document.activeElement !== input) input.value = status.hotkey;
-  }
   applyMode(status.mode ?? 'toggle');
+  // setValue is a no-op while the user is actively recording a new shortcut.
+  if (status.hotkey !== undefined) hotkeyCapture?.setValue(status.hotkey);
 }
 
 // --- Whisper models: list + download + cancel + set-active -----------------
@@ -239,21 +252,23 @@ function onDownloadProgress(p) {
 
 /** Wire the Capture pane: hotkey, mode control, model list + download events. */
 export function initCapture() {
-  // Hotkey Apply — setHotkey returns {ok,error}; undefined → treat as success.
-  document.getElementById('hotkey-save-btn')?.addEventListener('click', async () => {
-    const input = document.getElementById('hotkey-input');
-    const hotkey = (input?.value ?? '').trim();
-    if (!hotkey) return;
-    if (!hasMethod('setHotkey')) {
-      showToast('SigmaVoice bridge unavailable', 'warn');
-      return;
-    }
-    const res = await safeCall('setHotkey', hotkey);
-    if (res && res.ok === false) {
-      showToast(res.error || 'Could not set shortcut', 'error');
-    } else {
-      showToast('Hotkey updated');
-    }
+  // Record-shortcut control (replaces the raw accelerator text field). Mode-aware:
+  // push-to-talk accepts a bare-modifier combo (hold ⌘⇧ to talk); toggle requires
+  // a modifier + a base key. setHotkey returns {ok,error}; undefined → success.
+  hotkeyCapture = initHotkeyCapture({
+    getMode: () => currentMode,
+    onCommit: async (accel) => {
+      if (!hasMethod('setHotkey')) {
+        showToast('SigmaVoice bridge unavailable', 'warn');
+        return;
+      }
+      const res = await safeCall('setHotkey', accel);
+      if (res && res.ok === false) {
+        showToast(res.error || 'Could not set shortcut', 'error');
+      } else {
+        showToast('Shortcut set: ' + formatAccelerator(accel));
+      }
+    },
   });
 
   // Mode segmented control.
