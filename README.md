@@ -7,13 +7,18 @@ local, private — no cloud, no account.
 
 > Inspired by BridgeMind's BridgeVoice — but on-device by default and not paywalled.
 
-## Features (v0.3)
+## Features (v0.4)
 
-- **Global hotkey** dictation with **push-to-talk** (hold-to-talk) *and* toggle modes.
-- **On-device Whisper** transcription (tiny/base/small/medium) via `whisper.cpp` —
-  fully offline; macOS Speech.framework fallback.
+- **Global hotkey** dictation — **push-to-talk** (hold a modifier combo like ⌘⇧ *or* a
+  base-key shortcut) *and* toggle modes, set with a "press your keys" shortcut recorder.
+- **On-device Whisper** transcription (tiny/base/small/medium) via `whisper.cpp` — fully
+  offline; in-app model download (progress + Cancel); macOS Speech.framework fallback.
 - **Paste into anything** — clipboard + macOS Accessibility keystroke (CGEvent).
 - **Focus-preserving recording HUD** overlay (never steals focus from your target app).
+- **Always-visible floating pill** — click-to-dictate, drag-to-move (position remembered),
+  idle/listening/processing states; switchable **Logo & text ↔ Logo only**.
+- **Apple-grade settings** — macOS sidebar, system **light/dark** + vibrancy, an **Overview**
+  dashboard (Words / Sessions / WPM), hotkey shown as ⌘⌥⎵ keycaps.
 - **Dictionary & verbal macros** — literal substitutions (e.g. "new line" → ⏎,
   "bridge mind" → "BridgeMind") applied to every transcript.
 - **Usage stats** — words, sessions, average WPM, recent activity.
@@ -27,7 +32,7 @@ One-line install — `curl` doesn't set the Gatekeeper quarantine flag, so it ju
 curl -fsSL https://raw.githubusercontent.com/s1gmamale1/SigmaVoice/main/scripts/install-macos.sh | bash
 ```
 
-Pin a version: append `-s v0.3.0`. Prefer to inspect first:
+Pin a version: append `-s v0.4.0`. Prefer to inspect first:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/s1gmamale1/SigmaVoice/main/scripts/install-macos.sh -o install-sigmavoice.sh
@@ -136,6 +141,6 @@ on real GitHub runners (multi-arch native build) — until then, SigmaLink's
 ## Deferred
 
 - Windows keystroke-inject (`sendPasteKeystroke` equivalent) + Tier-3 typing fallback.
-- AI cleanup / custom-instructions reformatting; optional cloud transcription; floating pill.
+- AI cleanup / custom-instructions reformatting; optional cloud transcription.
 - Wake-word ("Hey Jorvis") listening mode (engine code exists, off by default).
 - Electron auto-updater; Developer-ID signing + notarization; DMG background art.

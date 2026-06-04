@@ -8,7 +8,7 @@ agent (no prior session memory) needs to be productive without re-learning the t
   Tray-only, unsigned/internal-use. Inspired by BridgeMind's BridgeVoice, but local + free.
 - **Repos:** this is `s1gmamale1/SigmaVoice` (the app + release home). The voice **engine** is
   `s1gmamale1/SigmaLink`, embedded here as a git submodule at `./sigmalink/`.
-- **Current release:** macOS arm64 v0.3.2 (`releases/tag/v0.3.2`). Windows blocked (W-SV1).
+- **Current release:** macOS arm64 **v0.4.0** (`releases/tag/v0.4.0`, GitHub **pre-release** — on-device smoke pending before promoting to stable; latest **stable** is v0.3.2). Windows blocked (W-SV1).
 
 ## Engine boundary — the single most important thing to understand
 

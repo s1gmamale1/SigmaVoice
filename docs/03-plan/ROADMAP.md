@@ -2,7 +2,7 @@
 
 SigmaVoice is a local-first, system-wide voice→text dictation app for macOS (Apple Silicon): global
 hotkey → on-device Whisper (macOS Speech fallback) → clipboard + AX-paste into the focused app; tray-only,
-unsigned/internal-use. **Shipped: macOS arm64 v0.3.2 (2026-05-29).** The voice engine + native modules
+unsigned/internal-use. **Shipped: macOS arm64 v0.4.0 (2026-06-04, GitHub pre-release; latest stable v0.3.2).** The voice engine + native modules
 live in the shared **SigmaLink submodule** (`./sigmalink/`, single source of truth). The detailed,
 file:line-grounded evidence behind every phase is in
 [`_research/codebase-findings.md`](./_research/codebase-findings.md) (69 adversarially-verified findings)
@@ -14,10 +14,11 @@ This ROADMAP is the single source of truth for what to build next.
 
 ---
 
-## Build status — `main` (updated 2026-06-04; **20 commits ahead of `origin/main`, unpushed**)
+## Build status — `main` (updated 2026-06-04; pushed; **`v0.4.0` pre-release shipped**)
 
-Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build`), spec+quality reviewed
-(no regressions). **NOT released** — pending operator **push** + **on-device smoke**:
+Merged + **pushed** to `main`, gate-green (`pnpm typecheck` + `pnpm test` 42/42 + `pnpm build`), spec+quality
+reviewed (no regressions). **Released as `v0.4.0`** — a GitHub **pre-release** (macOS arm64 DMG published);
+pending an **on-device smoke** before promoting to a stable release:
 
 - ✅ **Phase 0 — all items** (merge `9e74a81`): UX-1 tray icon · PF-1 prewarm · CA-3 boot guard · UX-10 hotkey
   validate+result · UX-5/UX-9/UX-12/UX-15 settings fixes · FE-9 download progress+Cancel · CA-6 HUD ceiling ·
@@ -36,7 +37,7 @@ Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build
 > The 4 reported symptoms were root-caused (full writeup: `WISHLIST.md` §Deep review findings): the record-start
 > **crash (c)** and **model-download (a)** are **already fixed on `main`** (ship-only — pin `35a290e`=v0.3.2 + FE-9);
 > **hold-to-talk (b)** and the **floating pill (d)** were genuine gaps, **now built** (Phase 1.5). **The on-device
-> "smoke" caveat below was effectively run on the wrong (old) build** → re-run it after push + release.
+> "smoke" caveat below was effectively run on the wrong (old) build** → re-run it on the **v0.4.0 pre-release DMG**.
 
 **Deferred (need operator input, hardware, or CI):**
 - **FE-4 (clipboard-only)** → engine track (Phase 4): `RouteOpts` has no output-mode hook; needs a `voice-core` change.
@@ -79,7 +80,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 0 — Make it present, functional & honest — ✅ DONE (merged to `main` `9e74a81`; pending release + on-device smoke)
+## Phase 0 — Make it present, functional & honest — ✅ DONE (merged `9e74a81`; shipped in v0.4.0 pre-release; on-device smoke pending)
 
 **Goal.** The tray app is visibly present, never boots into a silent inert state, gives truthful feedback on every action, and the first dictation of a session is fast.
 
@@ -112,7 +113,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 1 — Apple-grade UI/UX pass — ✅ DONE (merged to `main` `422c8d2`; pending push + on-device smoke)
+## Phase 1 — Apple-grade UI/UX pass — ✅ DONE (merged `422c8d2`; shipped in v0.4.0 pre-release; on-device smoke pending)
 
 **Goal.** The settings window and recording HUD look and behave Cupertino-grade — adaptive appearance, real materials, honest feedback, spring motion, and accessible targets.
 
@@ -137,7 +138,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 1.5 — Hold-to-talk activation + floating pill — ✅ DONE (merged to `main` `d55fbcf`; pending push + release + on-device smoke)
+## Phase 1.5 — Hold-to-talk activation + floating pill — ✅ DONE (merged `d55fbcf`; shipped in v0.4.0 pre-release; on-device smoke pending)
 
 **Goal.** Close the two genuine activation gaps the v0.3.1 on-device test exposed: hold a modifier combo (⌘⇧) to talk, and an always-visible floating pill that click-to-dictates — both without ever stealing keyboard focus from the app you dictate into.
 

@@ -42,7 +42,7 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   cross-compile in CI.
 - **Unsigned posture** stands (mac ad-hoc + afterSign codesign; win no Authenticode). Signing needs an ADR.
 
-## 2026-06-04 — Phase 1.5: hold-to-talk PTT + floating pill (merged to `main`, not yet released)
+## 2026-06-04 — Phase 1.5: hold-to-talk PTT + floating pill (shipped in v0.4.0 pre-release)
 - **Trigger.** An operator on-device test reported 4 symptoms. Root-caused (4 parallel agents + device
   forensics): the installed app was **v0.3.1 — two releases behind `main`**. The record-start crash
   (voice-mac 44.1kHz tap) and the model-download were **already fixed on `main`** (ship-only); only two
@@ -60,10 +60,11 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   REQUESTED — a [major] bug (the pill click started recording even when capture was *disabled* → now
   gated on `st.enabled`) + main.ts >500. Fixed (extract pill/model IPC → main.ts 498; clamp the live
   drag; +tests) → re-review: **both APPROVE** (sigma merge-gate **93/100**). App-shell only; no new deps.
-- **State:** `main` ahead of `origin` (unpushed, operator-gated). Pending: **push** + **on-device smoke**
-  (hold ⌘⇧ + Input-Monitoring grant; pill renders / click-dictates / drags / no focus-steal; paste) before release.
+- **State:** Pushed + **released as `v0.4.0`** (GitHub pre-release; macOS arm64 DMG; the release run is red only on
+  the Windows/W-SV1 job). Pending only the **on-device smoke** (hold ⌘⇧ + Input-Monitoring grant; pill renders /
+  click-dictates / drags / no focus-steal; paste) to promote v0.4.0 to a stable release.
 
-## 2026-06-01 — Phase 1: Apple-grade UI/UX (merged to `main`, not yet released)
+## 2026-06-01 — Phase 1: Apple-grade UI/UX (shipped in v0.4.0 pre-release)
 - **Shipped to `main`** (merge `422c8d2`, gate-green 20 tests, spec+quality reviewed/no-regressions, Playwright
   light+dark + 5 HUD states): settings restyled to a **macOS sidebar** app that follows **system light/dark**
   with real `vibrancy:'sidebar'`+`hiddenInset`; selectable cards+capability chips (Local active / Cloud "soon");
@@ -77,10 +78,10 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   (full gate+Playwright), using the stale worktree outputs only as design reference. For work that builds on
   committed changes, prefer a single/sequential main-tree agent over parallel worktree slices, or verify the
   worktree base first.
-- **State:** `main` is ahead of `origin` (unpushed, operator can't push yet). Still pending: **push** + an
-  **on-device smoke** (vibrancy/tray/sandbox/paste — not headless-verifiable) before any release/tag.
+- **State:** Shipped in **v0.4.0** (pre-release). Pending: the **on-device smoke** (vibrancy/tray/sandbox/paste —
+  not headless-verifiable) to promote to a stable release.
 
-## 2026-05-31 — Deep-dive analysis → Phase 0 + test harness + security (branch, not yet released)
+## 2026-05-31 — Deep-dive analysis → Phase 0 + test harness + security (shipped in v0.4.0 pre-release)
 - **Analysis.** A 5-dimension adversarially-verified code audit (**69 grounded findings**) + a frame-level
   **BridgeVoice competitive video teardown** rebuilt `WISHLIST.md` (categorized) + `ROADMAP.md` (canonical
   7-part phases + ADRs) with a durable evidence base in `docs/03-plan/_research/`. BridgeVoice = BridgeMind's
@@ -103,7 +104,11 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   then Phase 1 UI restyle (design-review), Phase 2 features, Phase 4 engine (W-SV1 Windows CI).
 
 ## Release history
-- **v0.3.2** (2026-05-29, Latest) — fixed the Test-Recording crash (AVAudioEngine tap `format:nil`,
+- **v0.4.0** (2026-06-04, **pre-release**) — Phase 0 (functional/honest UX: tray, prewarm, boot guard, download UX) +
+  Phase 1 (Apple-grade settings: sidebar, light/dark, Overview dashboard, honest HUD) + Phase 1.5 (modifier
+  **hold-to-talk** PTT + record-shortcut capture UI + always-visible **floating pill**). macOS arm64 DMG; the
+  release run is red only on the Windows/W-SV1 job. **On-device smoke pending → promote to stable.**
+- **v0.3.2** (2026-05-29, latest **stable**) — fixed the Test-Recording crash (AVAudioEngine tap `format:nil`,
   44.1kHz/2ch mics) + added the model-download UX (list/size/download%/activate). macOS arm64 DMG.
 - **v0.3.1** (deleted) — fixed v0.3.0 launch crash (`sudo-prompt` not bundled) + distinct icon.
 - **v0.3.0** (deleted) — first standalone DMG; crashed on launch (missing transitive dep).

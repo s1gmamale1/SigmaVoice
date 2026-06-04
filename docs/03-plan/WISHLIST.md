@@ -10,7 +10,7 @@
 >
 > **Legend:** `impact/effort` (S/M/L) · ⭐ high impact-to-effort · 🔧 engine (SigmaLink submodule —
 > author upstream, bump the pin) · 🔒 posture conflict → **ADR candidate, not a normal item**.
-> **Baseline:** macOS arm64 **v0.3.2** (2026-05-29). **Sourced from** a 5-dimension adversarially-verified
+> **Baseline:** macOS arm64 **v0.4.0** (2026-06-04, GitHub pre-release; latest stable v0.3.2). **Audit sourced from** a 5-dimension adversarially-verified
 > code audit (69 findings) + a BridgeVoice competitive video teardown, **2026-05-31**.
 
 ---
@@ -52,7 +52,7 @@ cloud-by-default, sync, telemetry, or signing (all 🔒). Full teardown + mappin
 
 ---
 
-## ✅ Done — merged to `main` (pending push + on-device smoke)
+## ✅ Done — shipped in v0.4.0 (pre-release; on-device smoke pending → stable)
 
 Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality reviewed (no regressions). Marked ✅ inline below.
 - **Phase 0 (all)** (merge `9e74a81`, 2026-05-31): UX-1 · UX-5 · UX-9 · UX-10 · UX-11 · UX-12 · UX-15 · FE-9 · CA-3 · CA-4 · CA-5 · CA-6 · CA-8 · PF-1 · PF-4.
