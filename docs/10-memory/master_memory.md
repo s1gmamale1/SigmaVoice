@@ -42,6 +42,27 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   cross-compile in CI.
 - **Unsigned posture** stands (mac ad-hoc + afterSign codesign; win no Authenticode). Signing needs an ADR.
 
+## 2026-06-04 — Phase 1.5: hold-to-talk PTT + floating pill (merged to `main`, not yet released)
+- **Trigger.** An operator on-device test reported 4 symptoms. Root-caused (4 parallel agents + device
+  forensics): the installed app was **v0.3.1 — two releases behind `main`**. The record-start crash
+  (voice-mac 44.1kHz tap) and the model-download were **already fixed on `main`** (ship-only); only two
+  were genuine open gaps → built here. Lesson saved: verify the INSTALLED build before assuming a
+  regression (installed ≠ HEAD). Findings: `docs/03-plan/WISHLIST.md` §Deep review (2026-06-04).
+- **Shipped to `main`** (merge `d55fbcf`, gate-green **42 tests**): (b) **modifier hold-to-talk PTT** —
+  hold a bare-modifier combo (⌘⇧) to talk; `node-global-key-listener` owns BOTH edges via a 250 ms
+  hold-delay state machine (Electron `globalShortcut` can't bind a bare modifier — **ADR-006**); a
+  **record-shortcut capture UI** replaced the raw accelerator text field. (d) An always-visible
+  **floating pill** (FE-2) — the focus-preserving HUD made persistent with an idle state, single-click
+  to dictate, drag-to-move + KV-persisted (clamped) position, + a **Logo&text ↔ Logo-only** appearance
+  toggle (FE-13). Pill ON by default. New pure modules: `pill-geometry.ts`, `pill.ts` (helpers tested),
+  `model-ipc.ts`.
+- **Review.** Two sub-agent reviews (`/sigma-pr-review` + `/github-code-review`). Round 1: gh CHANGES
+  REQUESTED — a [major] bug (the pill click started recording even when capture was *disabled* → now
+  gated on `st.enabled`) + main.ts >500. Fixed (extract pill/model IPC → main.ts 498; clamp the live
+  drag; +tests) → re-review: **both APPROVE** (sigma merge-gate **93/100**). App-shell only; no new deps.
+- **State:** `main` ahead of `origin` (unpushed, operator-gated). Pending: **push** + **on-device smoke**
+  (hold ⌘⇧ + Input-Monitoring grant; pill renders / click-dictates / drags / no focus-steal; paste) before release.
+
 ## 2026-06-01 — Phase 1: Apple-grade UI/UX (merged to `main`, not yet released)
 - **Shipped to `main`** (merge `422c8d2`, gate-green 20 tests, spec+quality reviewed/no-regressions, Playwright
   light+dark + 5 HUD states): settings restyled to a **macOS sidebar** app that follows **system light/dark**

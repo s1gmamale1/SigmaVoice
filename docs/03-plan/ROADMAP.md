@@ -14,7 +14,7 @@ This ROADMAP is the single source of truth for what to build next.
 
 ---
 
-## Build status — `main` (updated 2026-06-04; **16 commits ahead of `origin/main`, unpushed** + branch `feat/hotkey-hold-to-talk`)
+## Build status — `main` (updated 2026-06-04; **20 commits ahead of `origin/main`, unpushed**)
 
 Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build`), spec+quality reviewed
 (no regressions). **NOT released** — pending operator **push** + **on-device smoke**:
@@ -28,9 +28,9 @@ Merged to `main`, gate-green (`pnpm typecheck` + `pnpm test` 20/20 + `pnpm build
   (`settings.html` → html+css+9 js modules, all <500) + CSP tightened to `script-src 'self'`.
 - ✅ **Phase 3 partial** — **CA-1** test harness (16+4 tests, `node --test` native TS, zero deps) · **SEC-1/2/4/5**
   hardening (CSP, nav lockdown, sandbox, dictionary cap) · **CA-2** (done as part of Phase 1).
-- ✅ **Phase 1.5** (branch `feat/hotkey-hold-to-talk`, 2026-06-04 — see the phase below): modifier **hold-to-talk**
+- ✅ **Phase 1.5** (merged to `main` `d55fbcf`, 2026-06-04 — see the phase below): modifier **hold-to-talk**
   PTT + record-shortcut capture UI (symptom b) · always-visible **floating pill** (FE-2 + FE-13, symptom d).
-  Gate-green (`pnpm typecheck` + `pnpm build` + **37 tests**). App-shell only.
+  Gate-green (`pnpm typecheck` + `pnpm build` + **42 tests**); reviewed by 2 sub-agents (sigma 93/100 + gh APPROVE). App-shell only.
 
 > 🔴 **On-device finding (2026-06-04).** The operator's installed app is **v0.3.1** — TWO releases behind `main`.
 > The 4 reported symptoms were root-caused (full writeup: `WISHLIST.md` §Deep review findings): the record-start
@@ -137,7 +137,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 ---
 
-## Phase 1.5 — Hold-to-talk activation + floating pill — ✅ DONE (branch `feat/hotkey-hold-to-talk`; pending merge + release + on-device smoke)
+## Phase 1.5 — Hold-to-talk activation + floating pill — ✅ DONE (merged to `main` `d55fbcf`; pending push + release + on-device smoke)
 
 **Goal.** Close the two genuine activation gaps the v0.3.1 on-device test exposed: hold a modifier combo (⌘⇧) to talk, and an always-visible floating pill that click-to-dictates — both without ever stealing keyboard focus from the app you dictate into.
 
@@ -157,7 +157,7 @@ App-shell bugs surfaced by the audit, fixed in **Phase 0**. (Engine bugs W-SV1/W
 
 **Risks.** (1) Bare-modifier PTT needs macOS **Input Monitoring** — surfaced via the existing degrade warning + an inline Settings hint. (2) Click vs drag on the pill — a 4 px movement threshold disambiguates. (3) Focus-steal — the pill stays `focusable:false`, never calls focus(), and keeps the blur-on-focus guard. (4) The engine still attempts (and fails) `globalShortcut.register` for a bare modifier — its warn toast is suppressed app-shell-side by message-match (fails open). All four need real-device confirmation.
 
-**Definition of done.** ✅ `pnpm typecheck` + `pnpm build` + 37 tests green, committed on `feat/hotkey-hold-to-talk`. ⏳ Operator on-device smoke (after merge + release): holding ⌘⇧ records and releasing transcribes; the capture UI records a chosen shortcut; the floating pill shows at launch, click-to-dictates, drags + persists position, switches Logo/Logo+text, and never pulls focus from the target app.
+**Definition of done.** ✅ `pnpm typecheck` + `pnpm build` + 42 tests green; reviewed by 2 sub-agents (sigma-pr-review 93/100 + github-code-review APPROVE) and merged to `main` (`d55fbcf`). ⏳ Operator on-device smoke (after push + release): holding ⌘⇧ records and releasing transcribes; the capture UI records a chosen shortcut; the floating pill shows at launch, click-to-dictates, drags + persists position, switches Logo/Logo+text, and never pulls focus from the target app.
 
 ---
 
