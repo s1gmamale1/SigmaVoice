@@ -137,3 +137,20 @@ test('hold machine supports a second press/release cycle', () => {
   machine.update({ allModsHeld: false, otherKeyDown: false });
   assert.deepEqual(calls, ['start', 'stop', 'start', 'stop']);
 });
+
+test('hold machine ignores a non-modifier key WHILE recording (type while dictating)', () => {
+  const { machine, calls, fireTimer } = makeMachine();
+  machine.update({ allModsHeld: true, otherKeyDown: false }); // arm
+  fireTimer(); // start
+  machine.update({ allModsHeld: true, otherKeyDown: true }); // a key pressed mid-dictation
+  assert.deepEqual(calls, ['start']); // must NOT stop — only releasing a modifier stops
+});
+
+test('hold machine re-arms after a non-modifier cancel and can then start', () => {
+  const { machine, calls, fireTimer } = makeMachine();
+  machine.update({ allModsHeld: true, otherKeyDown: false }); // arm
+  machine.update({ allModsHeld: true, otherKeyDown: true }); // ⌘⇧3 → cancel (still armed→idle)
+  machine.update({ allModsHeld: true, otherKeyDown: false }); // re-arm
+  fireTimer();
+  assert.deepEqual(calls, ['start']);
+});

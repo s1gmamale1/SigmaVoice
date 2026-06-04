@@ -53,8 +53,6 @@ export interface HudController {
   showRecording(): void;
   /** Switch overlay to 'transcribing' state (renderer freezes its timer). */
   showTranscribing(): void;
-  /** Show the resting idle pill (persistent floating-pill mode). */
-  showIdle(): void;
   /**
    * Persistent (floating-pill) mode. When true, hide() and the safety timeouts
    * return the pill to its idle state instead of hiding the window, so it stays
@@ -241,15 +239,18 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
     }
   }
 
-  function doHide(): void {
+  /** Show the resting idle pill (persistent mode) — no auto-hide. */
+  function goIdle(): void {
+    showInactive();
+    sendState('idle');
     clearSafetyTimer();
+  }
+
+  function doHide(): void {
     // Persistent (pill) mode: "hide" means return to the resting idle pill —
     // the floating pill must stay on screen between dictations.
-    if (persistent) {
-      showInactive();
-      sendState('idle');
-      return;
-    }
+    if (persistent) { goIdle(); return; }
+    clearSafetyTimer();
     if (win && !win.isDestroyed() && win.isVisible()) {
       win.hide();
     }
@@ -276,28 +277,23 @@ export function createHudWindow(deps: HudWindowDeps): HudController {
       clearSafetyTimer();
       safetyTimer = setTimeout(doHide, TRANSCRIBE_SAFETY_MS);
     },
-    showIdle(): void {
-      showInactive();
-      sendState('idle');
-      clearSafetyTimer(); // idle is the resting state — no auto-hide
-    },
     setPersistent(on: boolean): void {
       persistent = on;
-      if (on) {
-        // Show the resting pill now, unless a capture is already on screen.
-        if (currentState !== 'recording' && currentState !== 'transcribing') {
-          showInactive();
-          sendState('idle');
-        }
-        clearSafetyTimer();
-      } else if (currentState === 'idle') {
+      // Show the resting pill now, unless a capture is already on screen.
+      if (on && currentState !== 'recording' && currentState !== 'transcribing') {
+        goIdle();
+      } else if (!on && currentState === 'idle') {
         // Leaving pill mode while resting → hide the overlay.
         if (win && !win.isDestroyed() && win.isVisible()) win.hide();
       }
     },
     moveTo(x: number, y: number): void {
       if (!win || win.isDestroyed()) return;
-      win.setBounds({ x: Math.round(x), y: Math.round(y), width: HUD_WIDTH, height: HUD_HEIGHT });
+      // Keep the pill on-screen: clamp to the work area of the display nearest the
+      // target point (multi-display safe) so a drag can't strand it off every display.
+      const wa = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) }).workArea;
+      const c = clampToWorkArea({ x, y }, { width: HUD_WIDTH, height: HUD_HEIGHT }, wa);
+      win.setBounds({ x: c.x, y: c.y, width: HUD_WIDTH, height: HUD_HEIGHT });
     },
     getPosition(): { x: number; y: number } | null {
       if (!win || win.isDestroyed()) return null;

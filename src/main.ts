@@ -25,12 +25,6 @@ import {
 import {
   buildGlobalCaptureController,
   type GlobalCaptureController,
-  MODEL_CATALOG,
-  isModelDownloaded,
-  downloadModel,
-  abortDownload,
-  isDownloading,
-  type DownloadProgress,
   getWhisperEngine,
   getModelById,
   getDefaultModel,
@@ -43,6 +37,8 @@ import { createFileKv, type KvStore } from './kv-store';
 import { getDictionary, setDictionary, getStatsSummary } from './settings-data';
 import { createHudWindow, type HudController } from './hud-window';
 import { createHotkeyManager, resolveModifierKeys, type HotkeyManager } from './hotkey-manager';
+import { isPillEnabled, pillHudDeps, registerPillIpc } from './pill';
+import { registerModelIpc } from './model-ipc';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -63,39 +59,8 @@ function getModelsDir(): string {
   return path.join(app.getPath('userData'), 'voice-models');
 }
 
-// ---------------------------------------------------------------------------
-// Floating pill (FE-2) — persisted in KV. Enabled by DEFAULT (absent → on).
-// ---------------------------------------------------------------------------
-
-const KV_PILL_ENABLED = 'voice.pill.enabled';
-const KV_PILL_APPEARANCE = 'voice.pill.appearance';
-const KV_PILL_POS = 'voice.pill.pos';
-
-/** Floating pill on? Default ON — only an explicit '0' disables it. */
-function isPillEnabled(): boolean {
-  return kv?.get(KV_PILL_ENABLED) !== '0';
-}
-
-/** Pill appearance: 'compact' (logo only) or 'full' (logo + wordmark, default). */
-function getPillAppearance(): 'full' | 'compact' {
-  return kv?.get(KV_PILL_APPEARANCE) === 'compact' ? 'compact' : 'full';
-}
-
-/** Saved pill top-left, or null for the default bottom-center. */
-function getSavedPillPosition(): { x: number; y: number } | null {
-  const raw = kv?.get(KV_PILL_POS);
-  if (!raw) return null;
-  try {
-    const p: unknown = JSON.parse(raw);
-    if (
-      p && typeof (p as { x?: unknown }).x === 'number' &&
-      typeof (p as { y?: unknown }).y === 'number'
-    ) {
-      return { x: (p as { x: number }).x, y: (p as { y: number }).y };
-    }
-  } catch { /* corrupt → default */ }
-  return null;
-}
+// Floating-pill settings + click/drag IPC live in src/pill.ts; Whisper
+// model-management IPC in src/model-ipc.ts (kept out of this orchestrator).
 
 // ---------------------------------------------------------------------------
 // Globals
@@ -353,83 +318,22 @@ function registerIpc(): void {
     kv ? getStatsSummary(kv) : { totalWords: 0, recordings: 0, avgWpm: 0, recent: [] },
   );
 
-  // --- Whisper model management -------------------------------------------
-  // List the catalog with per-model status (downloaded / downloading / active).
-  ipcMain.handle('bv:listModels', () => {
-    const modelsDir = getModelsDir();
-    const activeId = captureCtrl?.getStatus().modelId;
-    return MODEL_CATALOG.map((m) => ({
-      id: m.id,
-      name: m.name,
-      sizeMb: m.sizeMb,
-      isDefault: m.isDefault,
-      downloaded: isModelDownloaded(m, modelsDir),
-      downloading: isDownloading(m.id),
-      active: m.id === activeId,
-    }));
-  });
-
-  // Download a model; streams progress to the settings window over
-  // 'voice:model-download', resolves when complete (or rejects → caught here).
-  ipcMain.handle('bv:downloadModel', async (_e, id: string) => {
-    const entry = MODEL_CATALOG.find((m) => m.id === id);
-    if (!entry) return { ok: false, error: `Unknown model: ${id}` };
-    // The renderer understands an optional `aborted` terminal flag — a user cancel
-    // is a clean stop, not a failure — so the local emit widens the payload type.
-    const emit = (p: DownloadProgress & { aborted?: boolean }): void => {
+  // Whisper model management (list / download / abort) — src/model-ipc.ts.
+  registerModelIpc(ipcMain, {
+    getModelsDir,
+    getActiveModelId: () => captureCtrl?.getStatus().modelId,
+    send: (channel, payload) => {
       if (settingsWindow && !settingsWindow.isDestroyed()) {
-        settingsWindow.webContents.send('voice:model-download', p);
+        settingsWindow.webContents.send(channel, payload);
       }
-    };
-    try {
-      await downloadModel(entry, getModelsDir(), emit);
-      return { ok: true };
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      // A user-initiated cancel rejects with an "abort" message → surface it as a
-      // clean terminal state (row resets, no error toast), not a download failure.
-      if (/abort/i.test(message)) {
-        emit({ modelId: id, bytesDone: 0, bytesTotal: 0, fraction: 0, done: true, aborted: true });
-        return { ok: true, aborted: true };
-      }
-      emit({ modelId: id, bytesDone: 0, bytesTotal: 0, fraction: 0, done: true, error: message });
-      return { ok: false, error: message };
-    }
+    },
   });
 
-  // Abort an in-flight download.
-  ipcMain.handle('bv:abortDownload', (_e, id: string) => {
-    try { abortDownload(id); } catch { /* ignore */ }
-  });
-
-  // --- Floating pill (FE-2) ------------------------------------------------
-  ipcMain.handle('bv:getPillSettings', () => ({
-    enabled: isPillEnabled(),
-    appearance: getPillAppearance(),
-  }));
-  ipcMain.handle('bv:setPillEnabled', (_e, enabled: boolean) => {
-    kv?.set(KV_PILL_ENABLED, enabled ? '1' : '0');
-    hud?.setPersistent(!!enabled);
-  });
-  ipcMain.handle('bv:setPillAppearance', (_e, appearance: string) => {
-    kv?.set(KV_PILL_APPEARANCE, appearance === 'compact' ? 'compact' : 'full');
-    hud?.refreshAppearance();
-  });
-  // Renderer→main from the pill itself (one-way sends, validated here).
-  ipcMain.on('hud:toggle', () => {
-    const st = captureCtrl?.getStatus();
-    if (!captureCtrl || !st) return;
-    if (st.state === 'recording') void captureCtrl.stopAndTranscribe();
-    else if (st.state === 'idle') void captureCtrl.startRecording();
-    // transcribing → ignore (don't start a new capture mid-transcribe)
-  });
-  ipcMain.on('hud:move', (_e, pos: { x?: unknown; y?: unknown }) => {
-    if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') hud?.moveTo(pos.x, pos.y);
-  });
-  ipcMain.on('hud:move-end', (_e, pos: { x?: unknown; y?: unknown }) => {
-    if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
-      kv?.set(KV_PILL_POS, JSON.stringify({ x: Math.round(pos.x), y: Math.round(pos.y) }));
-    }
+  // Floating pill (FE-2): settings + click/drag IPC — src/pill.ts.
+  registerPillIpc(ipcMain, {
+    kv: () => kv,
+    ctrl: () => captureCtrl,
+    hud: () => hud,
   });
 }
 
@@ -520,12 +424,11 @@ app.whenReady().then(() => {
     hud = createHudWindow({
       preloadPath: path.join(__dirname, 'hud-preload.cjs'),
       htmlPath: path.join(__dirname, '..', 'renderer', 'hud.html'),
-      getSavedPosition: getSavedPillPosition,
-      getAppearance: getPillAppearance,
+      ...pillHudDeps(store),
     });
     // Floating pill (FE-2): when enabled (default ON) keep a resting idle pill on
     // screen between dictations instead of only flashing during capture.
-    if (isPillEnabled()) hud.setPersistent(true);
+    if (isPillEnabled(store)) hud.setPersistent(true);
 
     // True push-to-talk: supply the key-UP edge Electron's globalShortcut lacks.
     // Key-DOWN/start stays on the controller's globalShortcut; on release in
