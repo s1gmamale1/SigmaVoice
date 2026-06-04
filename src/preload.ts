@@ -25,6 +25,10 @@ contextBridge.exposeInMainWorld('bridgeVoice', {
   listModels: () => ipcRenderer.invoke('bv:listModels'),
   downloadModel: (id: string) => ipcRenderer.invoke('bv:downloadModel', id),
   abortDownload: (id: string) => ipcRenderer.invoke('bv:abortDownload', id),
+  getPillSettings: () => ipcRenderer.invoke('bv:getPillSettings'),
+  setPillEnabled: (enabled: boolean) => ipcRenderer.invoke('bv:setPillEnabled', enabled),
+  setPillAppearance: (appearance: 'full' | 'compact') =>
+    ipcRenderer.invoke('bv:setPillAppearance', appearance),
   onModelDownload: (cb: (p: unknown) => void) => {
     ipcRenderer.on('voice:model-download', (_e, p) => cb(p));
   },

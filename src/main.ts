@@ -64,6 +64,40 @@ function getModelsDir(): string {
 }
 
 // ---------------------------------------------------------------------------
+// Floating pill (FE-2) — persisted in KV. Enabled by DEFAULT (absent → on).
+// ---------------------------------------------------------------------------
+
+const KV_PILL_ENABLED = 'voice.pill.enabled';
+const KV_PILL_APPEARANCE = 'voice.pill.appearance';
+const KV_PILL_POS = 'voice.pill.pos';
+
+/** Floating pill on? Default ON — only an explicit '0' disables it. */
+function isPillEnabled(): boolean {
+  return kv?.get(KV_PILL_ENABLED) !== '0';
+}
+
+/** Pill appearance: 'compact' (logo only) or 'full' (logo + wordmark, default). */
+function getPillAppearance(): 'full' | 'compact' {
+  return kv?.get(KV_PILL_APPEARANCE) === 'compact' ? 'compact' : 'full';
+}
+
+/** Saved pill top-left, or null for the default bottom-center. */
+function getSavedPillPosition(): { x: number; y: number } | null {
+  const raw = kv?.get(KV_PILL_POS);
+  if (!raw) return null;
+  try {
+    const p: unknown = JSON.parse(raw);
+    if (
+      p && typeof (p as { x?: unknown }).x === 'number' &&
+      typeof (p as { y?: unknown }).y === 'number'
+    ) {
+      return { x: (p as { x: number }).x, y: (p as { y: number }).y };
+    }
+  } catch { /* corrupt → default */ }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Globals
 // ---------------------------------------------------------------------------
 
@@ -367,6 +401,36 @@ function registerIpc(): void {
   ipcMain.handle('bv:abortDownload', (_e, id: string) => {
     try { abortDownload(id); } catch { /* ignore */ }
   });
+
+  // --- Floating pill (FE-2) ------------------------------------------------
+  ipcMain.handle('bv:getPillSettings', () => ({
+    enabled: isPillEnabled(),
+    appearance: getPillAppearance(),
+  }));
+  ipcMain.handle('bv:setPillEnabled', (_e, enabled: boolean) => {
+    kv?.set(KV_PILL_ENABLED, enabled ? '1' : '0');
+    hud?.setPersistent(!!enabled);
+  });
+  ipcMain.handle('bv:setPillAppearance', (_e, appearance: string) => {
+    kv?.set(KV_PILL_APPEARANCE, appearance === 'compact' ? 'compact' : 'full');
+    hud?.refreshAppearance();
+  });
+  // Renderer→main from the pill itself (one-way sends, validated here).
+  ipcMain.on('hud:toggle', () => {
+    const st = captureCtrl?.getStatus();
+    if (!captureCtrl || !st) return;
+    if (st.state === 'recording') void captureCtrl.stopAndTranscribe();
+    else if (st.state === 'idle') void captureCtrl.startRecording();
+    // transcribing → ignore (don't start a new capture mid-transcribe)
+  });
+  ipcMain.on('hud:move', (_e, pos: { x?: unknown; y?: unknown }) => {
+    if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') hud?.moveTo(pos.x, pos.y);
+  });
+  ipcMain.on('hud:move-end', (_e, pos: { x?: unknown; y?: unknown }) => {
+    if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+      kv?.set(KV_PILL_POS, JSON.stringify({ x: Math.round(pos.x), y: Math.round(pos.y) }));
+    }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -452,11 +516,16 @@ app.whenReady().then(() => {
       },
     });
 
-    // Focus-preserving recording HUD overlay (lazily shown on first record).
+    // Focus-preserving recording HUD / floating pill overlay.
     hud = createHudWindow({
       preloadPath: path.join(__dirname, 'hud-preload.cjs'),
       htmlPath: path.join(__dirname, '..', 'renderer', 'hud.html'),
+      getSavedPosition: getSavedPillPosition,
+      getAppearance: getPillAppearance,
     });
+    // Floating pill (FE-2): when enabled (default ON) keep a resting idle pill on
+    // screen between dictations instead of only flashing during capture.
+    if (isPillEnabled()) hud.setPersistent(true);
 
     // True push-to-talk: supply the key-UP edge Electron's globalShortcut lacks.
     // Key-DOWN/start stays on the controller's globalShortcut; on release in

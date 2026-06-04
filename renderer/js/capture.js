@@ -287,4 +287,53 @@ export function initCapture() {
     bv.onModelDownload(onDownloadProgress);
   }
   renderModels();
+
+  // Floating pill (FE-2): show toggle + appearance segmented control.
+  initPill();
+}
+
+// --- Floating pill (FE-2) --------------------------------------------------
+
+function applyPillAppearance(appearance) {
+  const isCompact = appearance === 'compact';
+  document.getElementById('pill-appearance-full')?.setAttribute('aria-pressed', String(!isCompact));
+  document.getElementById('pill-appearance-compact')?.setAttribute('aria-pressed', String(isCompact));
+}
+
+/** The appearance control only matters when the pill is shown — dim it when off. */
+function setPillRowEnabled(enabled) {
+  const row = document.getElementById('pill-appearance-row');
+  if (row) row.style.opacity = enabled ? '' : '0.5';
+}
+
+function initPill() {
+  const toggle = document.getElementById('pill-enabled-toggle');
+
+  // Reflect persisted settings (pill is enabled by default in main).
+  void (async () => {
+    if (!hasMethod('getPillSettings')) return;
+    const s = await safeCall('getPillSettings');
+    if (!s) return;
+    if (toggle) {
+      toggle.checked = !!s.enabled;
+      toggle.setAttribute('aria-checked', String(!!s.enabled));
+    }
+    applyPillAppearance(s.appearance);
+    setPillRowEnabled(!!s.enabled);
+  })();
+
+  toggle?.addEventListener('change', async () => {
+    const on = !!toggle.checked;
+    toggle.setAttribute('aria-checked', String(on));
+    setPillRowEnabled(on);
+    await safeCall('setPillEnabled', on);
+  });
+  document.getElementById('pill-appearance-full')?.addEventListener('click', async () => {
+    applyPillAppearance('full');
+    await safeCall('setPillAppearance', 'full');
+  });
+  document.getElementById('pill-appearance-compact')?.addEventListener('click', async () => {
+    applyPillAppearance('compact');
+    await safeCall('setPillAppearance', 'compact');
+  });
 }
