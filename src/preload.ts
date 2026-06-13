@@ -29,6 +29,14 @@ contextBridge.exposeInMainWorld('bridgeVoice', {
   setPillEnabled: (enabled: boolean) => ipcRenderer.invoke('bv:setPillEnabled', enabled),
   setPillAppearance: (appearance: 'full' | 'compact') =>
     ipcRenderer.invoke('bv:setPillAppearance', appearance),
+  // ADR-007 — Cloud/LLM
+  setOpenRouterKey: (key: string) => ipcRenderer.invoke('bv:setOpenRouterKey', key),
+  hasOpenRouterKey: () => ipcRenderer.invoke('bv:hasOpenRouterKey'),
+  clearOpenRouterKey: () => ipcRenderer.invoke('bv:clearOpenRouterKey'),
+  getRemoteSttConfig: () => ipcRenderer.invoke('bv:getRemoteSttConfig'),
+  setRemoteSttConfig: (cfg: unknown) => ipcRenderer.invoke('bv:setRemoteSttConfig', cfg),
+  getTransformConfig: () => ipcRenderer.invoke('bv:getTransformConfig'),
+  setTransformConfig: (cfg: unknown) => ipcRenderer.invoke('bv:setTransformConfig', cfg),
   onModelDownload: (cb: (p: unknown) => void) => {
     ipcRenderer.on('voice:model-download', (_e, p) => cb(p));
   },
