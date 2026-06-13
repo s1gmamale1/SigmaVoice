@@ -32,6 +32,7 @@ import { initCapture, applyCaptureStatus } from './capture.js';
 import { initDictionary, loadDictionary } from './dictionary.js';
 import { initUsage, loadStats } from './usage.js';
 import { initTest, updateRecordBtn } from './test.js';
+import { initCloud, loadCloud } from './cloud.js';
 
 // --- Status fan-out --------------------------------------------------------
 
@@ -50,6 +51,7 @@ function onPaneActivate(panel) {
   if (panel === 'overview') renderOverviewStats();
   if (panel === 'dictionary') loadDictionary();
   if (panel === 'usage') loadStats();
+  if (panel === 'cloud') loadCloud();
 }
 
 // --- Bootstrap -------------------------------------------------------------
@@ -61,6 +63,7 @@ function boot() {
   initDictionary();
   initUsage();
   initTest();
+  initCloud();
 
   // Sidebar selection + pane show/hide; fires onPaneActivate for the initial pane.
   initSidebar(onPaneActivate);
