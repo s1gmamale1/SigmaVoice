@@ -20,6 +20,7 @@ import {
   Menu,
   nativeImage,
   Notification,
+  safeStorage,
   Tray,
 } from 'electron';
 import {
@@ -39,6 +40,8 @@ import { createHudWindow, type HudController } from './hud-window';
 import { createHotkeyManager, resolveModifierKeys, type HotkeyManager } from './hotkey-manager';
 import { isPillEnabled, pillHudDeps, registerPillIpc } from './pill';
 import { registerModelIpc } from './model-ipc';
+import { createSecretStore, type SecretStore, type SafeStorageLike } from './secret-store';
+import { registerLlmIpc } from './llm-ipc';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -50,6 +53,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // ---------------------------------------------------------------------------
 
 let kv: KvStore | null = null;
+let secrets: SecretStore | null = null;
 
 // ---------------------------------------------------------------------------
 // Models directory — store under <userData>/voice-models/
@@ -329,6 +333,9 @@ function registerIpc(): void {
     },
   });
 
+  // Cloud/LLM IPC (ADR-007): OpenRouter key + remote-STT + transform config.
+  registerLlmIpc(ipcMain, { kv: () => kv, secrets: () => secrets });
+
   // Floating pill (FE-2): settings + click/drag IPC — src/pill.ts.
   registerPillIpc(ipcMain, {
     kv: () => kv,
@@ -351,6 +358,8 @@ function prewarmModel(): void {
     // Don't fire a throwaway transcribe while a real capture is mid-flight — it
     // would contend with the active session. Only prewarm when idle.
     if (st && st.state !== 'idle') return;
+    // Don't prewarm the local engine when a remote STT backend is active.
+    if (kv?.get('voice.transcriptionMode') === 'openai-whisper-api') return;
     const model = (st?.modelId ? getModelById(st.modelId) : null) ?? getDefaultModel();
     const modelPath = getDownloadedModelPath(model, getModelsDir());
     if (!modelPath || modelPath === lastWarmedModelPath) return; // nothing to do / already warm
@@ -392,6 +401,13 @@ app.whenReady().then(() => {
     const store = createFileKv(path.join(app.getPath('userData'), 'sigmavoice-kv.json'));
     kv = store;
 
+    // ADR-007 — encrypted secret store for the OpenRouter API key. Electron's
+    // safeStorage satisfies SafeStorageLike (isEncryptionAvailable/encryptString/decryptString).
+    secrets = createSecretStore({
+      backend: safeStorage as unknown as SafeStorageLike,
+      filePath: path.join(app.getPath('userData'), 'sigmavoice-secrets.json'),
+    });
+
     captureCtrl = buildGlobalCaptureController({
       emit: (event, payload) => {
         // Swallow the engine's "could not register hotkey" warn for a
@@ -418,6 +434,8 @@ app.whenReady().then(() => {
       clipboard: {
         writeText: (text: string) => clipboard.writeText(text),
       },
+      // ADR-007 — OpenRouter cleanup reads the key from the ENCRYPTED secret store.
+      transformDeps: { getApiKey: () => secrets?.getSecret('provider.openrouter.apiKey') ?? null },
     });
 
     // Focus-preserving recording HUD / floating pill overlay.
