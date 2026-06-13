@@ -28,6 +28,22 @@ test('setRemoteSttConfig rejects an enabled config with a bad url', () => {
   assert.equal(kv.get('voice.transcriptionMode'), null);
 });
 
+test('setRemoteSttConfig rejects an enabled url with no host (non-http scheme)', () => {
+  // WHATWG-hostless http(s) urls (e.g. "http://") throw and are caught; "file:///x"
+  // parses with an empty hostname, so the hostname-non-empty guard rejects it.
+  const kv = fakeKv();
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'file:///etc/passwd', model: '', apiKey: '' });
+  assert.equal(r.ok, false);
+  assert.equal(kv.get('voice.transcriptionMode'), null);
+});
+
+test('setRemoteSttConfig enabled with empty apiKey persists empty string (keyless LAN)', () => {
+  const kv = fakeKv();
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'http://192.168.1.5:9000', model: '', apiKey: '' });
+  assert.equal(r.ok, true);
+  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), '');
+});
+
 test('setRemoteSttConfig disabled reverts mode to local (keeps url for next time)', () => {
   const kv = fakeKv({ 'voice.transcriptionMode': 'openai-whisper-api', 'voice.stt.openai-whisper-api.baseUrl': 'http://x/v1' });
   const r = setRemoteSttConfig(kv, { enabled: false, baseUrl: 'http://x/v1', model: '', apiKey: '' });
@@ -47,6 +63,12 @@ test('setTransformConfig validates mode + preset and caps the custom prompt', ()
   assert.equal(r.ok, true);
   assert.equal(kv.get('voice.transform.mode'), 'openrouter');
   assert.equal(kv.get('voice.transform.preset'), 'custom');
+  assert.equal((kv.get('voice.transform.prompt') ?? '').length, 2000);
+});
+
+test('setTransformConfig keeps a prompt of exactly 2000 chars unchanged', () => {
+  const kv = fakeKv();
+  setTransformConfig(kv, { mode: 'openrouter', model: 'm', preset: 'custom', prompt: 'y'.repeat(2000) });
   assert.equal((kv.get('voice.transform.prompt') ?? '').length, 2000);
 });
 

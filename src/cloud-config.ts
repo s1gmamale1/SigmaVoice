@@ -4,7 +4,7 @@
 // it lives in the encrypted secret-store (src/secret-store.ts). The STT key is a
 // per-server token kept in KV alongside the URL (matches the existing voice.stt.* keys).
 
-import type { KvStore } from './kv-store.ts';
+import type { KvStore } from './kv-store';
 
 const STT_MODE = 'voice.transcriptionMode';
 const STT_BASE = 'voice.stt.openai-whisper-api.baseUrl';
@@ -25,7 +25,7 @@ export interface TransformConfig { mode: 'off' | 'openrouter'; model: string; pr
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
 function isHttpUrl(s: string): boolean {
-  try { const u = new URL(s); return u.protocol === 'http:' || u.protocol === 'https:'; } catch { return false; }
+  try { const u = new URL(s); return (u.protocol === 'http:' || u.protocol === 'https:') && u.hostname !== ''; } catch { return false; }
 }
 
 export function getRemoteSttConfig(kv: KvStore): RemoteSttConfig {
