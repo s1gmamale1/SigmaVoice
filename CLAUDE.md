@@ -70,3 +70,7 @@ macOS arm64 + Windows x64 only · unsigned (mac ad-hoc / win no Authenticode) ·
 ## Docs map
 `docs/HANDOFF.md` (orientation) · `docs/08-bugs/OPEN.md` (bugs+repro) · `docs/04-design/native-gotchas.md`
 · `docs/03-plan/{WISHLIST,ROADMAP}.md` · `docs/ddd/DOMAINS.md` · `docs/10-memory/{master_memory,memory_index}.md`.
+
+
+<!-- sigmalink-guardrails:start -->
+<!-- sigmalink-guardrails:end -->
