@@ -1,5 +1,5 @@
 // SigmaVoice — Cloud pane (ADR-007): remote STT + OpenRouter cleanup config.
-import { bv, safeCall } from './settings.js';
+import { safeCall } from './settings.js';
 import { showToast } from './toast.js';
 
 function $(id) { return document.getElementById(id); }
