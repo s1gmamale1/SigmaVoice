@@ -50,3 +50,25 @@ test('falls back to base64 (unencrypted) when encryption is unavailable', () => 
 test('getSecret returns null for a missing key', () => {
   assert.equal(createSecretStore({ backend: encBackend(true), filePath: tmpFile() }).getSecret('nope'), null);
 });
+
+test('setSecret throws (does not silently store b64) when encryptString fails while encryption is "available"', () => {
+  const brokenBackend: SafeStorageLike = {
+    isEncryptionAvailable: () => true,
+    encryptString: () => { throw new Error('keychain locked'); },
+    decryptString: () => { throw new Error('keychain locked'); },
+  };
+  const store = createSecretStore({ backend: brokenBackend, filePath: tmpFile() });
+  assert.throws(() => store.setSecret('k', 'secret'), /keychain locked/);
+});
+
+test('getSecret returns null (not a wrong value) when decryptString throws', () => {
+  const file = tmpFile();
+  createSecretStore({ backend: encBackend(true), filePath: file }).setSecret('k', 'v');
+  const brokenDecrypt: SafeStorageLike = {
+    isEncryptionAvailable: () => true,
+    encryptString: (s) => Buffer.from(`ENC:${s}`, 'utf8'),
+    decryptString: () => { throw new Error('unavailable'); },
+  };
+  const store = createSecretStore({ backend: brokenDecrypt, filePath: file });
+  assert.equal(store.getSecret('k'), null);
+});

@@ -28,6 +28,7 @@ export interface SecretStore {
 export function createSecretStore(opts: { backend: SafeStorageLike; filePath: string }): SecretStore {
   const { backend, filePath } = opts;
   const encrypted = (() => { try { return backend.isEncryptionAvailable(); } catch { return false; } })();
+  if (!encrypted) console.warn('[secret-store] OS encryption unavailable — secrets stored base64-encoded, NOT encrypted.');
   let data: Record<string, string> = {};
 
   try {
@@ -41,7 +42,7 @@ export function createSecretStore(opts: { backend: SafeStorageLike; filePath: st
 
   function persist(): void {
     try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
+      fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
       const tmp = `${filePath}.tmp`;
       fs.writeFileSync(tmp, JSON.stringify(data), { encoding: 'utf8', mode: 0o600 });
       fs.renameSync(tmp, filePath);
@@ -50,7 +51,10 @@ export function createSecretStore(opts: { backend: SafeStorageLike; filePath: st
 
   function encode(plaintext: string): string {
     if (encrypted) {
-      try { return `enc:${backend.encryptString(plaintext).toString('base64')}`; } catch { /* fall through */ }
+      // Encryption is available — never silently fall back to plaintext. Let a runtime
+      // failure propagate so the caller can surface it instead of storing an unencrypted
+      // secret while isEncrypted() reports true.
+      return `enc:${backend.encryptString(plaintext).toString('base64')}`;
     }
     return `b64:${Buffer.from(plaintext, 'utf8').toString('base64')}`;
   }
@@ -66,7 +70,7 @@ export function createSecretStore(opts: { backend: SafeStorageLike; filePath: st
   return {
     getSecret: (name) => (name in data ? decode(data[name]) : null),
     setSecret: (name, value) => { data[name] = encode(value); persist(); },
-    hasSecret: (name) => name in data,
+    hasSecret: (name) => name in data && decode(data[name]) !== null,
     clearSecret: (name) => { if (name in data) { delete data[name]; persist(); } },
     isEncrypted: () => encrypted,
   };
