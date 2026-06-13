@@ -35,8 +35,8 @@ async function loadTransform() {
     const toggle = $('tf-toggle');
     if (toggle) { toggle.checked = on; toggle.setAttribute('aria-checked', String(on)); }
     show($('tf-fields'), on);
-    $('tf-model').value = cfg.model;
-    $('tf-preset').value = cfg.preset;
+    $('tf-model').value = cfg.model ?? 'google/gemini-2.5-flash-lite';
+    $('tf-preset').value = cfg.preset ?? 'punctuate';
     $('tf-prompt').value = cfg.prompt ?? '';
     show($('tf-prompt-row'), cfg.preset === 'custom');
   }
@@ -64,7 +64,7 @@ async function saveTransform() {
   });
   if (res && res.ok === false) showToast(res.error || 'Could not save', 'error');
   else showToast('AI cleanup saved');
-  loadTransform();
+  void loadTransform();
 }
 
 export function initCloud() {
