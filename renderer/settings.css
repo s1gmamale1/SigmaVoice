@@ -439,3 +439,9 @@ body {
 /* ── Utility ────────────────────────────────────────────────── */
 .flex-end { justify-content: flex-end; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* ── Cloud pane (ADR-007) ───────────────────────────────────── */
+.text-input { font: inherit; padding: 6px 10px; border-radius: var(--r-sm); border: 1px solid var(--divider); background: var(--fill-secondary); color: var(--label-primary); min-width: 220px; outline: none; transition: border-color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out); }
+.text-input:focus { border-color: var(--accent); background: var(--accent-dim); }
+.text-input::placeholder { color: var(--label-disabled); }
+.cloud-warn { color: var(--orange); margin-top: 6px; }
