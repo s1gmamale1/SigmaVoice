@@ -66,6 +66,13 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
 - **State:** Released as **v0.5.1** (GitHub pre-release; macOS arm64 DMG). The release run is **red only on the
   Windows/W-SV1 job** — the macOS job succeeds and publishes the DMG. macOS users get the WIN-4 persistence
   hardening + secret false-success fix; keycap/copy changes are inert on mac until the Windows build unblocks.
+- **Installer hotfix (post-v0.5.1, `main`-only).** Operator ran the curl|bash installer and it resolved
+  **v0.3.2** (months old). Root cause: `scripts/install-macos.sh` used GitHub `/releases/latest`, which returns
+  only the newest **stable** release — but `release.yml` publishes every build as `prerelease:true` (commit
+  `446c835`), so the last stable is v0.3.2 and all of v0.4.0/0.5.0/0.5.1 were invisible. Fixed: resolve from
+  `/releases?per_page=1` (newest published, pre-release included). Verified live (`/releases/latest`→v0.3.2 vs
+  `/releases?per_page=1`→v0.5.1). The script is served from `main`, so the fix is **live for the one-liner with
+  no new tag**. Pinning (`bash -s vX.Y.Z`) still overrides. This is the flip-side of SEC-7.
 
 ## 2026-06-04 — Phase 1.5: hold-to-talk PTT + floating pill (shipped in v0.4.0 pre-release)
 - **Trigger.** An operator on-device test reported 4 symptoms. Root-caused (4 parallel agents + device

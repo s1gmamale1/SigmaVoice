@@ -20,7 +20,7 @@
 #   bash install-sigmavoice.sh
 #
 #   Pin a specific version:
-#   curl -fsSL .../install-macos.sh | bash -s v0.3.0
+#   curl -fsSL .../install-macos.sh | bash -s v0.5.1
 #
 # After install, SigmaVoice runs in the menu-bar/tray. On first use macOS will
 # ask for Microphone + Accessibility (paste) and — for push-to-talk — Input
@@ -54,16 +54,21 @@ fi
 
 TAG="${1:-}"
 if [[ -z "$TAG" ]]; then
-  echo "→ Resolving latest release from GitHub..."
+  echo "→ Resolving latest release (incl. pre-releases) from GitHub..."
+  # Use /releases (newest published first), NOT /releases/latest: the latter
+  # returns only the newest *stable* release, but SigmaVoice publishes every
+  # build as a pre-release (internal/unsigned), so /releases/latest stays stuck
+  # on the last stable (v0.3.2). /releases?per_page=1 = newest published release,
+  # pre-release included. Pin a tag ("bash -s vX.Y.Z") to override.
   TAG="$(
-    curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+    curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=1" \
       | grep '"tag_name"' \
       | head -1 \
       | sed -E 's/.*"tag_name":[[:space:]]*"([^"]+)".*/\1/'
   )" || {
     echo "✗ Failed to fetch latest release tag from GitHub API." >&2
     echo "  Possible cause: rate-limit (anonymous API quota is 60/hr/IP)." >&2
-    echo "  Workaround: pass an explicit tag, e.g.:  curl ... | bash -s v0.3.0" >&2
+    echo "  Workaround: pass an explicit tag, e.g.:  curl ... | bash -s v0.5.1" >&2
     exit 3
   }
 fi
