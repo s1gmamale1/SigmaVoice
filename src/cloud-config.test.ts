@@ -44,6 +44,21 @@ test('setRemoteSttConfig enabled with empty apiKey persists empty string (keyles
   assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), '');
 });
 
+test('setRemoteSttConfig preserves the stored key when apiKey is omitted', () => {
+  const kv = fakeKv({ 'voice.stt.openai-whisper-api.apiKey': 'secret' });
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'http://x/v1', model: 'whisper-large-v3' });
+  assert.equal(r.ok, true);
+  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), 'secret');
+  assert.equal(kv.get('voice.transcriptionMode'), 'openai-whisper-api');
+});
+
+test('setRemoteSttConfig switches to local with only {enabled:false}', () => {
+  const kv = fakeKv({ 'voice.transcriptionMode': 'openai-whisper-api' });
+  const r = setRemoteSttConfig(kv, { enabled: false });
+  assert.equal(r.ok, true);
+  assert.equal(kv.get('voice.transcriptionMode'), 'local');
+});
+
 test('setRemoteSttConfig disabled reverts mode to local (keeps url for next time)', () => {
   const kv = fakeKv({ 'voice.transcriptionMode': 'openai-whisper-api', 'voice.stt.openai-whisper-api.baseUrl': 'http://x/v1' });
   const r = setRemoteSttConfig(kv, { enabled: false, baseUrl: 'http://x/v1', model: '', apiKey: '' });
