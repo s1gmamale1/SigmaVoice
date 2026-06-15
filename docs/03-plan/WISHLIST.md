@@ -4,6 +4,7 @@
 > - **Execution sequence** (priority-ordered, phased) → [`ROADMAP.md`](./ROADMAP.md)
 > - **Full evidence** (file:line, recommendations) → [`_research/codebase-findings.md`](./_research/codebase-findings.md)
 >   + [`_research/bridgevoice-video-analysis.md`](./_research/bridgevoice-video-analysis.md)
+>   + [`_research/2026-06-16-windows-parity-audit.md`](./_research/2026-06-16-windows-parity-audit.md) (🪟 `WIN-*`)
 > - **Shipped record / archive** → GitHub Releases + `docs/10-memory/master_memory.md`
 >
 > Flow: capture here → sequence into `ROADMAP.md` for the phase → on ship, move to the archive.
@@ -182,6 +183,45 @@ Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality revie
 - **ENG-8** whisper threads from `availableParallelism()` (validate vs Metal GPU-bound). `low/M`
 - **ENG-9** AX-paste 50ms → ~10–20ms / next-tick (measure). `low/S`
 - **ENG-10** Resample in the native worker / avoid the double main-thread copy at stop. `low/M`
+
+## 🪟 Windows parity (app-shell) — audit 2026-06-16; full evidence → [`_research/2026-06-16-windows-parity-audit.md`](./_research/2026-06-16-windows-parity-audit.md)
+> 5-agent read-only Phase-1 audit of `main`@`a58d4b3`. **No Windows build ships until W-SV1 (🅷) clears** —
+> but cloud STT may not need local whisper (confirm engine-side) → these become live. Validate runtime
+> items via `pnpm dev` on Windows (this dev box). All in-repo unless flagged.
+
+### Tier 1 — first 5 minutes on Windows
+- **WIN-1** Keycaps render hardcoded mac glyphs ⌘⌥⌃ on Windows (and ⌘ for a binding that fires on Ctrl) —
+  tray menu + settings + Overview + capture UI + hint copy. `high/M` ⭐ · bug
+- **WIN-2** HUD pinned above taskbar/Start (`setAlwaysOnTop('screen-saver')`), default-ON, no dismiss →
+  intrusive on Windows. `high/S` · bug
+- **WIN-3** Degraded push-to-talk help points to macOS "Input Monitoring" (no such permission on Windows). `medium/S`
+- **WIN-4** Silent persistence loss: `renameSync`-over-existing `EPERM`/`EACCES` on Windows (AV/locks),
+  errors swallowed, `setSecret` reports false success, shared `.tmp` race. `high/M` ⭐ · bug
+- **WIN-5** Hotkey capture maps the Win key → `CommandOrControl` (records Ctrl); punctuation capture uses
+  layout-dependent `e.key`. `medium/M` · bug
+
+### Tier 2 — correctness / parity
+- **WIN-6** Window/pill geometry not DPI/`scaleFactor`-aware → mis-place/size on mixed-DPI multi-monitor. `medium/M` · bug
+- **WIN-7** Second-instance won't foreground settings on Windows (`app.focus({steal})` darwin-only). `medium/S` · bug
+- **WIN-8** Tray left-click is a no-op on Windows (no `tray.on('click')`); 18px PNG icon, no ICO/DPI variants. `medium/S`
+- **WIN-9** Remote-STT API key stored plaintext in KV JSON, not the encrypted secret-store. `medium/S` · 🔒 (ADR-007 decision)
+- **WIN-10** "macOS Speech" hardcoded engine label shown on Windows (fallback is SAPI5). `low/S`
+- **WIN-11** NSIS installer welcome page links to the WRONG repo (SigmaLink, not SigmaVoice). `medium/S`
+- **WIN-12** Packaged `WinKeyServer.exe` inclusion unverified → could silently break PTT. `medium/S` (gated on W-SV1)
+
+### Tier 3 — polish / posture
+- **WIN-13** Windows polish bundle (see research §Tier 3): (a) Windows fallback styling — HUD `backdrop-filter`
+  glass flattens, settings `vibrancy`/`hiddenInset`/`transparent` inert, no `nativeTheme`; (b) `0o600/0o700`
+  modes ignored on Windows (mitigated by DPAPI); (c) `setVisibleOnAllWorkspaces` over-fullscreen promise
+  mac-only; (d) set `productName` → fixes dev↔packaged userData divergence ⭐; (e) NSIS config completeness;
+  (f) no `install-windows.ps1`; (g) drop redundant `npm_config_build_from_source`; (h) base64-fallback
+  "no OS keyring" copy. `low/varies`
+
+### Infra
+- **WIN-14** CI always-on gate (`ci.yml`) has zero Windows coverage — add a `windows-latest` typecheck+build
+  leg (no natives, fast; doesn't need W-SV1). `medium/S` ⭐
+- **WIN-15** `release.yml` build-windows lacks explicit VS/CMake/Python toolchain (works by luck of the
+  runner image). `medium/S` (latent, gated W-SV1)
 
 ---
 
