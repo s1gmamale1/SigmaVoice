@@ -57,6 +57,12 @@ test('getRemoteSttConfig reflects persisted values + enabled flag', () => {
   assert.deepEqual(getRemoteSttConfig(kv), { enabled: true, baseUrl: 'http://x/v1', model: 'm' });
 });
 
+test('getRemoteSttConfig defaults model to whisper-large-v3 when unset', () => {
+  assert.deepEqual(getRemoteSttConfig(fakeKv()), {
+    enabled: false, baseUrl: '', model: 'whisper-large-v3',
+  });
+});
+
 test('setTransformConfig validates mode + preset and caps the custom prompt', () => {
   const kv = fakeKv();
   const r = setTransformConfig(kv, { mode: 'openrouter', model: 'google/gemini-2.5-flash-lite', preset: 'custom', prompt: 'x'.repeat(5000) });

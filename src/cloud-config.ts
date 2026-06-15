@@ -18,6 +18,7 @@ const TF_PROMPT = 'voice.transform.prompt';
 const PROMPT_CAP = 2000;
 const VALID_PRESETS = new Set(['punctuate', 'fillers', 'email', 'custom']);
 const DEFAULT_TF_MODEL = 'google/gemini-2.5-flash-lite';
+const DEFAULT_STT_MODEL = 'whisper-large-v3';
 
 export interface RemoteSttConfig { enabled: boolean; baseUrl: string; model: string; }
 export interface RemoteSttInput { enabled: boolean; baseUrl: string; model: string; apiKey: string; }
@@ -32,7 +33,7 @@ export function getRemoteSttConfig(kv: KvStore): RemoteSttConfig {
   return {
     enabled: kv.get(STT_MODE) === 'openai-whisper-api',
     baseUrl: kv.get(STT_BASE) ?? '',
-    model: kv.get(STT_MODEL) ?? '',
+    model: kv.get(STT_MODEL) ?? DEFAULT_STT_MODEL,
   };
 }
 
