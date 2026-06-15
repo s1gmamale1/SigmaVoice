@@ -34,7 +34,7 @@
      installer and this message will go away.$\r$\n\
      $\r$\n\
      The installer is NOT malicious. The source is fully open at:$\r$\n\
-     https://github.com/s1gmamale1/SigmaLink$\r$\n$\r$\n\
-   Release notes:  https://github.com/s1gmamale1/SigmaLink/releases$\r$\n\
-   Source:         https://github.com/s1gmamale1/SigmaLink$\r$\n\
-   Issues:         https://github.com/s1gmamale1/SigmaLink/issues"
+     https://github.com/s1gmamale1/SigmaVoice$\r$\n$\r$\n\
+   Release notes:  https://github.com/s1gmamale1/SigmaVoice/releases$\r$\n\
+   Source:         https://github.com/s1gmamale1/SigmaVoice$\r$\n\
+   Issues:         https://github.com/s1gmamale1/SigmaVoice/issues"

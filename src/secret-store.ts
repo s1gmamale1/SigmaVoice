@@ -6,7 +6,7 @@
 // When OS encryption is unavailable, degrades to base64 (clearly flagged).
 
 import fs from 'node:fs';
-import path from 'node:path';
+import { atomicWriteFileSync } from './atomic-write.ts';
 
 /** The subset of Electron's `safeStorage` we depend on. */
 export interface SafeStorageLike {
@@ -40,13 +40,12 @@ export function createSecretStore(opts: { backend: SafeStorageLike; filePath: st
     }
   } catch { data = {}; }
 
+  // Throws on an unrecoverable write failure so setSecret can surface it, rather
+  // than reporting success while the secret never reached disk. (mode bits are
+  // POSIX owner-only; ignored on Windows, where safeStorage→DPAPI is the real
+  // protection.)
   function persist(): void {
-    try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true, mode: 0o700 });
-      const tmp = `${filePath}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(data), { encoding: 'utf8', mode: 0o600 });
-      fs.renameSync(tmp, filePath);
-    } catch { /* non-fatal */ }
+    atomicWriteFileSync(filePath, JSON.stringify(data), { mode: 0o600, dirMode: 0o700 });
   }
 
   function encode(plaintext: string): string {
@@ -71,7 +70,7 @@ export function createSecretStore(opts: { backend: SafeStorageLike; filePath: st
     getSecret: (name) => (name in data ? decode(data[name]) : null),
     setSecret: (name, value) => { data[name] = encode(value); persist(); },
     hasSecret: (name) => name in data && decode(data[name]) !== null,
-    clearSecret: (name) => { if (name in data) { delete data[name]; persist(); } },
+    clearSecret: (name) => { if (name in data) { delete data[name]; try { persist(); } catch { /* best-effort: clearing is non-critical */ } } },
     isEncrypted: () => encrypted,
   };
 }

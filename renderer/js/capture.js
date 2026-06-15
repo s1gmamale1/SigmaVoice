@@ -32,14 +32,23 @@ export function applyMode(mode) {
       ? 'Tap hotkey to start/stop'
       : 'Hold hotkey while speaking';
   }
-  // The Input-Monitoring note + the resting hotkey hint only matter for PTT.
+  // Input Monitoring is a macOS-only permission — the note is mac-only. On
+  // Windows the global key listener needs no permission, so hide it there.
+  const isWin = !!(window.bridgeVoice && window.bridgeVoice.platform === 'win32');
   const imNote = document.getElementById('hotkey-im-note');
-  if (imNote) imNote.hidden = isToggle;
+  if (imNote) imNote.hidden = isToggle || isWin;
+  // Resting hotkey hint — only matters for PTT; uses platform-appropriate keys.
   const hint = document.getElementById('hotkey-hint');
   if (hint) {
-    hint.textContent = isToggle
-      ? 'Press a shortcut — a modifier plus a key (e.g. ⌘⌥Space).'
-      : 'Hold the keys you want to push-to-talk with (e.g. ⌘⇧), then release.';
+    if (isToggle) {
+      hint.textContent = isWin
+        ? 'Press a shortcut — a modifier plus a key (e.g. Ctrl+Alt+Space).'
+        : 'Press a shortcut — a modifier plus a key (e.g. ⌘⌥Space).';
+    } else {
+      hint.textContent = isWin
+        ? 'Hold the keys you want to push-to-talk with (e.g. Ctrl+Shift), then release.'
+        : 'Hold the keys you want to push-to-talk with (e.g. ⌘⇧), then release.';
+    }
   }
 }
 

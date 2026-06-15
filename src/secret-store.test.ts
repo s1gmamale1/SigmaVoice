@@ -72,3 +72,10 @@ test('getSecret returns null (not a wrong value) when decryptString throws', () 
   const store = createSecretStore({ backend: brokenDecrypt, filePath: file });
   assert.equal(store.getSecret('k'), null);
 });
+
+test('setSecret propagates a persistence failure (no false success)', () => {
+  // Force persist() to fail by pointing the store at a path that is a directory.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sv-secret-dir-'));
+  const store = createSecretStore({ backend: encBackend(true), filePath: dir });
+  assert.throws(() => store.setSecret('k', 'v'));
+});

@@ -56,3 +56,11 @@ test('an array-shaped file is treated as empty (not an object map)', () => {
   const kv = createFileKv(tmpPath);
   assert.equal(kv.get('0'), null);
 });
+
+test('set does not throw when persistence fails (capture contract), still served from memory', () => {
+  // filePath is a directory → every write fails; set() must still not throw.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sv-kv-dir-'));
+  const kv = createFileKv(dir);
+  assert.doesNotThrow(() => kv.set('a', 'b'));
+  assert.equal(kv.get('a'), 'b');
+});
