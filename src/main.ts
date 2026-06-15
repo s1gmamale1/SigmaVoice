@@ -90,10 +90,16 @@ let degradedWarned = false;
 function warnPushToTalkDegraded(): void {
   if (degradedWarned) return;
   degradedWarned = true;
-  const body =
-    'Hold-to-talk needs Input Monitoring (System Settings → Privacy & ' +
-    'Security → Input Monitoring). Until granted, the hotkey works as ' +
-    'tap-to-toggle: press once to start, press again to stop.';
+  // Input Monitoring is a macOS-only permission. On Windows there is no such
+  // permission — the global key listener (node-global-key-listener) failing to
+  // attach has a different cause — so give platform-appropriate guidance.
+  const body = process.platform === 'darwin'
+    ? 'Hold-to-talk needs Input Monitoring (System Settings → Privacy & ' +
+      'Security → Input Monitoring). Until granted, the hotkey works as ' +
+      'tap-to-toggle: press once to start, press again to stop.'
+    : 'Hold-to-talk couldn’t start the global key listener (security software ' +
+      'may be blocking it), so the hotkey works as tap-to-toggle: press once ' +
+      'to start, press again to stop.';
   try {
     if (Notification.isSupported()) {
       new Notification({ title: 'SigmaVoice — push-to-talk limited', body }).show();

@@ -14,9 +14,15 @@ on:
 
 jobs:
   build:
-    name: typecheck + bundle
-    runs-on: macos-14
+    name: typecheck + bundle (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # macOS is the shipping target; windows-latest catches Windows-specific
+        # bundle/path regressions early (natives stay external, so no W-SV1 dep).
+        os: [macos-14, windows-latest]
     steps:
       - name: Checkout (with SigmaLink submodule)
         uses: actions/checkout@v4

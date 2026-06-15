@@ -12,6 +12,9 @@ interface DictionaryEntry {
 }
 
 contextBridge.exposeInMainWorld('bridgeVoice', {
+  // Host platform (`process.platform`), so the renderer can render keycaps and
+  // permission copy correctly per-OS (e.g. Ctrl/Win vs ⌘ — see keycaps.js).
+  platform: process.platform,
   getStatus: () => ipcRenderer.invoke('bv:getStatus'),
   setEnabled: (enabled: boolean) => ipcRenderer.invoke('bv:setEnabled', enabled),
   setHotkey: (hotkey: string) => ipcRenderer.invoke('bv:setHotkey', hotkey),

@@ -118,7 +118,7 @@ dmg:
 publish:
   provider: github
   owner: s1gmamale1
-  repo: SigmaLink
+  repo: SigmaVoice
 
 # Ad-hoc codesign sweep — same pattern as app/scripts/adhoc-sign.cjs.
 # Path is relative to this config file (app/apps/sigma-voice/).

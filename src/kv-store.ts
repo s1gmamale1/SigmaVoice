@@ -9,7 +9,7 @@
 // Intentionally tiny + synchronous to match the KV contract voice-core expects.
 
 import fs from 'node:fs';
-import path from 'node:path';
+import { atomicWriteFileSync } from './atomic-write.ts';
 
 export interface KvStore {
   get(key: string): string | null;
@@ -41,12 +41,11 @@ export function createFileKv(filePath: string): KvStore {
 
   function persist(): void {
     try {
-      fs.mkdirSync(path.dirname(filePath), { recursive: true });
-      const tmp = `${filePath}.tmp`;
-      fs.writeFileSync(tmp, JSON.stringify(data), 'utf8');
-      fs.renameSync(tmp, filePath);
-    } catch {
-      // Non-fatal: persistence failure must never disrupt capture.
+      atomicWriteFileSync(filePath, JSON.stringify(data));
+    } catch (err) {
+      // Non-fatal: persistence failure must never disrupt capture. Surfaced for
+      // visibility — a silently-swallowed write previously meant lost data.
+      console.warn('[kv-store] persist failed:', err instanceof Error ? err.message : err);
     }
   }
 
