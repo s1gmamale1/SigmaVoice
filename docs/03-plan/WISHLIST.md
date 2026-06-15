@@ -188,15 +188,21 @@ Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality revie
 > 5-agent read-only Phase-1 audit of `main`@`a58d4b3`. **No Windows build ships until W-SV1 (🅷) clears** —
 > but cloud STT may not need local whisper (confirm engine-side) → these become live. Validate runtime
 > items via `pnpm dev` on Windows (this dev box). All in-repo unless flagged.
+> **✅ Quick-wins shipped in v0.5.1** (PR #2 — gate-green, 2-reviewer SHIP, merged `a28a24d`): WIN-1, WIN-3,
+> WIN-4, WIN-11, WIN-13d, WIN-14. The macOS-relevant subset (WIN-4 + the secret false-success fix) is live
+> in the v0.5.1 DMG; keycap/copy changes are inert on mac until the Windows build unblocks.
 
 ### Tier 1 — first 5 minutes on Windows
-- **WIN-1** Keycaps render hardcoded mac glyphs ⌘⌥⌃ on Windows (and ⌘ for a binding that fires on Ctrl) —
-  tray menu + settings + Overview + capture UI + hint copy. `high/M` ⭐ · bug
+- ✅ **WIN-1** [shipped v0.5.1] Platform-aware keycaps — Windows shows Ctrl/Alt/Win/Shift text
+  (`CommandOrControl`→Ctrl, never ⌘); mac glyphs unchanged. `src/keycaps.ts` + renderer mirror + `platform`
+  via preload + a parity test enforcing the KEYCAP CONTRACT. `high/M` ⭐ · bug
 - **WIN-2** HUD pinned above taskbar/Start (`setAlwaysOnTop('screen-saver')`), default-ON, no dismiss →
   intrusive on Windows. `high/S` · bug
-- **WIN-3** Degraded push-to-talk help points to macOS "Input Monitoring" (no such permission on Windows). `medium/S`
-- **WIN-4** Silent persistence loss: `renameSync`-over-existing `EPERM`/`EACCES` on Windows (AV/locks),
-  errors swallowed, `setSecret` reports false success, shared `.tmp` race. `high/M` ⭐ · bug
+- ✅ **WIN-3** [shipped v0.5.1] Degraded-PTT "Input Monitoring" copy platform-branched (mac-only); settings
+  note hidden + Ctrl+Alt hints on Windows. `medium/S`
+- ✅ **WIN-4** [shipped v0.5.1] Persistence write-safety — new `src/atomic-write.ts` (unique temp, retry on
+  transient Windows lock errors, overwrite fallback, throws); secret-store propagates failure (kills the
+  false-success bug), kv-store best-effort + warns. `high/M` ⭐ · bug
 - **WIN-5** Hotkey capture maps the Win key → `CommandOrControl` (records Ctrl); punctuation capture uses
   layout-dependent `e.key`. `medium/M` · bug
 
@@ -206,22 +212,29 @@ Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality revie
 - **WIN-8** Tray left-click is a no-op on Windows (no `tray.on('click')`); 18px PNG icon, no ICO/DPI variants. `medium/S`
 - **WIN-9** Remote-STT API key stored plaintext in KV JSON, not the encrypted secret-store. `medium/S` · 🔒 (ADR-007 decision)
 - **WIN-10** "macOS Speech" hardcoded engine label shown on Windows (fallback is SAPI5). `low/S`
-- **WIN-11** NSIS installer welcome page links to the WRONG repo (SigmaLink, not SigmaVoice). `medium/S`
+- ✅ **WIN-11** [shipped v0.5.1] NSIS installer welcome page + `publish.repo` → SigmaVoice (were SigmaLink). `medium/S`
 - **WIN-12** Packaged `WinKeyServer.exe` inclusion unverified → could silently break PTT. `medium/S` (gated on W-SV1)
 
 ### Tier 3 — polish / posture
 - **WIN-13** Windows polish bundle (see research §Tier 3): (a) Windows fallback styling — HUD `backdrop-filter`
   glass flattens, settings `vibrancy`/`hiddenInset`/`transparent` inert, no `nativeTheme`; (b) `0o600/0o700`
   modes ignored on Windows (mitigated by DPAPI); (c) `setVisibleOnAllWorkspaces` over-fullscreen promise
-  mac-only; (d) set `productName` → fixes dev↔packaged userData divergence ⭐; (e) NSIS config completeness;
-  (f) no `install-windows.ps1`; (g) drop redundant `npm_config_build_from_source`; (h) base64-fallback
+  mac-only; ✅ (d) [shipped v0.5.1] set `productName` → fixes dev↔packaged userData divergence; (e) NSIS config
+  completeness; (f) no `install-windows.ps1`; (g) drop redundant `npm_config_build_from_source`; (h) base64-fallback
   "no OS keyring" copy. `low/varies`
 
 ### Infra
-- **WIN-14** CI always-on gate (`ci.yml`) has zero Windows coverage — add a `windows-latest` typecheck+build
-  leg (no natives, fast; doesn't need W-SV1). `medium/S` ⭐
+- ✅ **WIN-14** [shipped v0.5.1] `ci.yml` is now a `[macos-14, windows-latest]` matrix (early Windows signal);
+  also fixed the `pnpm test` glob (single→double quotes) so it isn't a vacuous no-op under cmd.exe on Windows. `medium/S` ⭐
 - **WIN-15** `release.yml` build-windows lacks explicit VS/CMake/Python toolchain (works by luck of the
   runner image). `medium/S` (latent, gated W-SV1)
+
+### Follow-ups (from the v0.5.1 PR #2 review — non-blocking)
+- **WIN-16** Unify platform detection: `renderer/js/capture.js` derives `isWin` from `window.bridgeVoice.platform`
+  only, while `renderer/js/keycaps.js#defaultPlatform()` has a richer fallback — they can disagree if the
+  preload fails to load. Share one helper. `low/S`
+- **WIN-17** `build/dmg/README — Open SigmaVoice.txt` still links the macOS "Source" to
+  `github.com/s1gmamale1/SigmaLink` — the mac-side twin of WIN-11 (pre-existing). Repoint to SigmaVoice. `low/S`
 
 ---
 

@@ -42,6 +42,31 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   cross-compile in CI.
 - **Unsigned posture** stands (mac ad-hoc + afterSign codesign; win no Authenticode). Signing needs an ADR.
 
+## 2026-06-15 — v0.5.1: Windows-parity app-shell quick-wins
+- **Trigger.** "Optimize under Windows" → a 5-agent read-only audit (Phase-1 of `/systematic-debugging`) of the
+  app shell vs the Windows x64 target. 20 in-repo findings + 6 engine-side parked. Full evidence:
+  `docs/03-plan/_research/2026-06-16-windows-parity-audit.md`; triaged as `WIN-*` in `WISHLIST.md`.
+- **Shipped to `main`** (PR #2, merge `a28a24d`, gate-green **typecheck + 70 tests + build** run on Windows; two
+  adversarial reviewers both SHIP): **WIN-1** platform-aware keycaps (Windows shows Ctrl/Alt/Win/Shift text, not
+  ⌘; `src/keycaps.ts` + renderer mirror + `platform` via preload + a parity test); **WIN-4** persistence
+  write-safety (new `src/atomic-write.ts` — unique temp name, retry on transient Windows lock errors, overwrite
+  fallback, throws; secret-store now *propagates* write failure → fixes a false-success in `llm-ipc`; kv-store
+  stays best-effort + warns); **WIN-3** "Input Monitoring" copy is mac-only → platform-branched; **WIN-11**
+  installer URLs + `publish.repo` → SigmaVoice; **WIN-13d** `productName` (dev↔packaged userData parity);
+  **WIN-14** `ci.yml` macOS+Windows matrix + fixed the `pnpm test` glob (single→double quotes; it was a no-op
+  under cmd.exe). Deferred: med-confidence GUI items (WIN-2/6/7/8) want a `pnpm dev` Windows repro; WIN-9 is an
+  ADR-007 decision; WIN-12/15 gated on W-SV1. Follow-ups: WIN-16 (unify capture.js/keycaps.js platform detection),
+  WIN-17 (stale mac dmg-README SigmaLink URL).
+- **Insight.** The v0.5.0 remote-STT/cloud path likely side-steps W-SV1 (cloud STT doesn't need the local whisper
+  native) — if `voice-core` can boot without whisper (engine-side; confirm in SigmaLink), these app-shell fixes
+  become shippable to Windows *ahead* of a W-SV1 fix.
+- **Setup note.** Gating on this Windows dev box needed `git submodule update --init sigmalink` (non-recursive is
+  enough for typecheck/build) + `corepack prepare pnpm@9` + `pnpm install --ignore-scripts`. `node --test` runs
+  the `.ts` suites directly (Node 22).
+- **State:** Released as **v0.5.1** (GitHub pre-release; macOS arm64 DMG). The release run is **red only on the
+  Windows/W-SV1 job** — the macOS job succeeds and publishes the DMG. macOS users get the WIN-4 persistence
+  hardening + secret false-success fix; keycap/copy changes are inert on mac until the Windows build unblocks.
+
 ## 2026-06-04 — Phase 1.5: hold-to-talk PTT + floating pill (shipped in v0.4.0 pre-release)
 - **Trigger.** An operator on-device test reported 4 symptoms. Root-caused (4 parallel agents + device
   forensics): the installed app was **v0.3.1 — two releases behind `main`**. The record-start crash
@@ -104,6 +129,13 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
   then Phase 1 UI restyle (design-review), Phase 2 features, Phase 4 engine (W-SV1 Windows CI).
 
 ## Release history
+- **v0.5.1** (2026-06-15, **pre-release**) — Windows-parity app-shell quick-wins: WIN-1 (platform-aware keycaps),
+  WIN-3 (Input-Monitoring copy), WIN-4 (persistence write-safety + secret false-success fix), WIN-11 (installer
+  URLs), WIN-13d (`productName`), WIN-14 (CI macOS+Windows matrix). macOS arm64 DMG; release run red only on the
+  Windows/W-SV1 job. macOS gets the WIN-4 + secret fix; keycap/copy changes are inert on mac.
+- **v0.5.0** (2026-06-15, **pre-release**) — ADR-007: remote STT (cloud Whisper endpoint) + OpenRouter LLM
+  cleanup/transform, with an encrypted secret-store (`safeStorage` → DPAPI on Windows / Keychain on macOS).
+  macOS arm64 DMG.
 - **v0.4.0** (2026-06-04, **pre-release**) — Phase 0 (functional/honest UX: tray, prewarm, boot guard, download UX) +
   Phase 1 (Apple-grade settings: sidebar, light/dark, Overview dashboard, honest HUD) + Phase 1.5 (modifier
   **hold-to-talk** PTT + record-shortcut capture UI + always-visible **floating pill**). macOS arm64 DMG; the
