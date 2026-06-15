@@ -20,3 +20,9 @@ ruvector.db
 
 # Agent worktrees (created by the Workflow tool for isolated parallel slices)
 .claude/worktrees/
+
+# Machine-local Claude/Cursor overrides (these embed absolute paths — same reason
+# as .mcp.json above). The REST of .claude/ (agents, commands, skills, settings.json)
+# is shareable project config and may be committed deliberately.
+.claude/settings.local.json
+.cursor/mcp.json
