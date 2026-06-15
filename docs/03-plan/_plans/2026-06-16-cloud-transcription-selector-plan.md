@@ -18,6 +18,8 @@
 |---|---|---|
 | `src/cloud-config.ts` | Pure read/validate/persist of remote-STT + transform config | Add `DEFAULT_STT_MODEL`; make `apiKey`/`baseUrl`/`model` optional with preserve-on-omit semantics |
 | `src/cloud-config.test.ts` | Unit tests for the above | Add 3 tests |
+| `src/llm-ipc.ts` | IPC handlers bridging the renderer to `cloud-config` | Forward an **omitted** `apiKey` as `undefined` (not `''`) so the preserve semantic holds end-to-end |
+| `src/llm-ipc.test.ts` | (new) IPC handler unit tests | Test omit-preserves-key / explicit-`''`-clears via a fake `ipcMain` |
 | `renderer/settings.html` | Capture-pane card markup + Cloud-pane STT field | Replace both mode cards; update STT model placeholder |
 | `renderer/settings.css` | Mode-card styling | Add focus/hover + selected-only check visibility |
 | `renderer/js/capture.js` | Capture-pane behavior | Add transcription-mode selector logic; update header comment |
@@ -247,6 +249,94 @@ git commit -m "style(ui): focus/hover + selected-only check for mode cards"
 
 ---
 
+## Task 4b: IPC preserve-glue — forward omitted `apiKey` as `undefined`
+
+**Why:** `setRemoteSttConfig`'s "omit = preserve key" semantic (Task 2) only holds if the IPC layer
+doesn't flatten the missing field. Today `src/llm-ipc.ts` does `apiKey: String(c.apiKey ?? '')`, so a
+renderer call that omits the key arrives as `''` and **clears** it. The Capture "Cloud" toggle (Task 5)
+omits the key, so without this fix it would wipe a stored STT key. `cloud.js` always sends an explicit
+string, so its behavior is unchanged.
+
+**Files:**
+- Modify: `src/llm-ipc.ts` (the `bv:setRemoteSttConfig` handler, ~lines 43–53)
+- Create: `src/llm-ipc.test.ts`
+
+- [ ] **Step 1: Write the failing tests**
+
+Create `src/llm-ipc.test.ts`:
+
+```ts
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { IpcMain } from 'electron';
+import type { KvStore } from './kv-store.ts';
+import { registerLlmIpc } from './llm-ipc.ts';
+
+function fakeKv(seed?: Record<string, string>): KvStore {
+  const map = new Map<string, string>(Object.entries(seed ?? {}));
+  return { get: (k) => (map.has(k) ? map.get(k)! : null), set: (k, v) => { map.set(k, v); } };
+}
+
+function fakeIpc() {
+  const handlers = new Map<string, (e: unknown, arg: unknown) => unknown>();
+  const ipcMain = { handle: (ch: string, fn: (e: unknown, arg: unknown) => unknown) => { handlers.set(ch, fn); } } as unknown as IpcMain;
+  return { ipcMain, invoke: (ch: string, arg?: unknown) => handlers.get(ch)!(null, arg) };
+}
+
+test('bv:setRemoteSttConfig preserves the stored key when apiKey is omitted', () => {
+  const kv = fakeKv({ 'voice.stt.openai-whisper-api.apiKey': 'secret' });
+  const { ipcMain, invoke } = fakeIpc();
+  registerLlmIpc(ipcMain, { kv: () => kv, secrets: () => null });
+  const r = invoke('bv:setRemoteSttConfig', { enabled: true, baseUrl: 'http://x/v1', model: 'whisper-large-v3' }) as { ok: boolean };
+  assert.equal(r.ok, true);
+  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), 'secret');
+  assert.equal(kv.get('voice.transcriptionMode'), 'openai-whisper-api');
+});
+
+test('bv:setRemoteSttConfig clears the key when apiKey is an explicit empty string', () => {
+  const kv = fakeKv({ 'voice.stt.openai-whisper-api.apiKey': 'secret' });
+  const { ipcMain, invoke } = fakeIpc();
+  registerLlmIpc(ipcMain, { kv: () => kv, secrets: () => null });
+  invoke('bv:setRemoteSttConfig', { enabled: true, baseUrl: 'http://x/v1', model: 'm', apiKey: '' });
+  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), '');
+});
+```
+
+- [ ] **Step 2: Run the tests to verify they fail**
+
+Run: `node --test "src/**/*.test.ts"`
+Expected: FAIL — the preserve test sees `''` (key wiped) because the handler coerces `undefined → ''`.
+
+- [ ] **Step 3: Forward omitted `apiKey` as `undefined`**
+
+In `src/llm-ipc.ts`, change the `bv:setRemoteSttConfig` handler's `apiKey` line (line 51) from
+`apiKey: String(c.apiKey ?? ''),` to:
+
+```ts
+      // Preserve the stored key when the caller omits apiKey (the Capture-pane
+      // Cloud toggle does); an explicit string (incl. '') still applies verbatim.
+      apiKey: typeof c.apiKey === 'string' ? c.apiKey : undefined,
+```
+
+- [ ] **Step 4: Run the tests to verify they pass**
+
+Run: `node --test "src/**/*.test.ts"`
+Expected: PASS — all green.
+
+- [ ] **Step 5: Typecheck**
+
+Run: `pnpm typecheck`
+Expected: PASS.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add src/llm-ipc.ts src/llm-ipc.test.ts
+git commit -m "fix(cloud): forward omitted STT apiKey as undefined (preserve key)"
+```
+
+---
+
 ## Task 5: Capture-pane selector logic
 
 **Files:**
@@ -444,6 +534,6 @@ Expected: clean (all task commits landed; no stray files).
 
 ## Self-Review
 
-- **Spec coverage:** §A live selector → Tasks 3,4,5,6. §B default model → Tasks 1,3. §C optional apiKey → Task 2. Edge cases (bad endpoint, bridge absent, key preservation) → Task 5 (`selectCloud` error/nav paths, `safeCall` no-op) + Task 2 test. Manual smoke → Task 7. No gaps.
+- **Spec coverage:** §A live selector → Tasks 3,4,5,6. §B default model → Tasks 1,3. §C optional apiKey → Task 2 (config) **+ Task 4b (IPC glue, so preserve holds end-to-end through the bridge)**. Edge cases (bad endpoint, bridge absent, key preservation) → Task 5 (`selectCloud` error/nav paths, `safeCall` no-op) + Task 2 / Task 4b tests. Manual smoke → Task 7. No gaps.
 - **Type consistency:** `CLOUD_MODE = 'openai-whisper-api'` matches `getRemoteSttConfig().enabled` semantics; `refreshTranscriptionMode` is exported from `capture.js` and imported in `settings.js` under the same name; `setRemoteSttConfig` is called with `{enabled:false}` and `{enabled:true,baseUrl,model}`, both valid under the Task-2 optional-field interface.
 - **No placeholders:** every code/test step shows complete content; renderer files (no harness) use `pnpm build` + the explicit Task-7 smoke checklist instead of fake tests.
