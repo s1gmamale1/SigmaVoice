@@ -117,13 +117,13 @@ body {
   background: var(--rail-bg);
   backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
   border-right: 1px solid var(--divider);
+  -webkit-app-region: drag;   /* whole sidebar is a window drag handle; .rail-item opts out */
 }
 
-/* Drag region so the hiddenInset traffic lights sit cleanly. */
+/* Sized to clear the hiddenInset traffic lights; drag comes from .rail. */
 .rail-header {
   height: 52px; min-height: 52px;
   display: flex; align-items: flex-end; padding: 0 var(--s-2) var(--s-2);
-  -webkit-app-region: drag;
 }
 .rail-title { font-size: 13px; font-weight: 700; letter-spacing: -0.01em; color: var(--label-secondary); user-select: none; }
 
@@ -150,10 +150,19 @@ body {
 
 /* ── Content pane ───────────────────────────────────────────── */
 .content {
-  flex: 1; min-width: 0; overflow-y: auto;
-  padding: var(--s-5) var(--s-5) var(--s-6); background: var(--content-bg);
+  flex: 1; min-width: 0; display: flex; flex-direction: column;
+  overflow: hidden; background: var(--content-bg);
 }
-.content::-webkit-scrollbar { width: 0; }
+/* Invisible top strip: a window drag handle where the title bar would be. */
+.content-titlebar {
+  height: 28px; min-height: 28px; flex-shrink: 0;
+  -webkit-app-region: drag;
+}
+.content-scroll {
+  flex: 1; min-height: 0; overflow-y: auto;
+  padding: var(--s-2) var(--s-5) var(--s-6);
+}
+.content-scroll::-webkit-scrollbar { width: 0; }
 
 .pane { display: none; }
 .pane.active { display: block; animation: pane-in var(--dur-mid) var(--ease-out); }
