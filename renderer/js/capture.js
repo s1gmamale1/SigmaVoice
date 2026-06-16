@@ -1,7 +1,8 @@
 // SigmaVoice — Capture pane.
 //
-// Transcription mode (Local active / Cloud disabled — Cloud is decorative,
-// NEVER wired), the model list with size + 'Download required' pill +
+// Transcription mode (live Local/Cloud selector driven by voice.transcriptionMode;
+// Cloud routes to the Cloud pane when no remote endpoint is configured), the model
+// list with size + 'Download required' pill +
 // determinate progress bar + Cancel (FE-9, bv.abortDownload), the hotkey input
 // + Apply (UX-10 success/fail toast), and the mode segmented control. setHotkey
 // returns {ok,error}; undefined (bridge absent / no-op) is treated as success.
@@ -58,6 +59,78 @@ export function applyCaptureStatus(status) {
   applyMode(status.mode ?? 'toggle');
   // setValue is a no-op while the user is actively recording a new shortcut.
   if (status.hotkey !== undefined) hotkeyCapture?.setValue(status.hotkey);
+}
+
+// --- Transcription mode (Local / Cloud selector) ---------------------------
+
+const CLOUD_MODE = 'openai-whisper-api';
+
+/** Reflect the active transcription mode onto the Local/Cloud cards. */
+function applyTranscriptionMode(mode) {
+  const cloud = mode === CLOUD_MODE;
+  const localCard = document.getElementById('mode-card-local');
+  const cloudCard = document.getElementById('mode-card-cloud');
+  localCard?.classList.toggle('selected', !cloud);
+  cloudCard?.classList.toggle('selected', cloud);
+  localCard?.setAttribute('aria-pressed', String(!cloud));
+  cloudCard?.setAttribute('aria-pressed', String(cloud));
+}
+
+/** Re-read persisted mode and reflect it (on init + Capture pane re-activation). */
+export async function refreshTranscriptionMode() {
+  const cfg = await safeCall('getRemoteSttConfig');
+  applyTranscriptionMode(cfg?.enabled ? CLOUD_MODE : 'local');
+}
+
+/** Jump the sidebar to the Cloud pane (reuses the rail item's own handler). */
+function gotoCloudPane() {
+  document.querySelector('.rail-item[data-panel="cloud"]')?.click();
+}
+
+async function selectLocal() {
+  applyTranscriptionMode('local'); // optimistic
+  const res = await safeCall('setRemoteSttConfig', { enabled: false });
+  if (res && res.ok === false) {
+    showToast(res.error || 'Could not switch to Local', 'error');
+    void refreshTranscriptionMode();
+    return;
+  }
+  showToast('Local transcription on');
+}
+
+async function selectCloud() {
+  const cfg = await safeCall('getRemoteSttConfig');
+  if (!cfg || !cfg.baseUrl) {
+    showToast('Set your remote Whisper endpoint to use Cloud', 'warn');
+    gotoCloudPane();
+    return;
+  }
+  const res = await safeCall('setRemoteSttConfig', { enabled: true, baseUrl: cfg.baseUrl, model: cfg.model });
+  if (res && res.ok === false) {
+    showToast(res.error || 'Could not enable Cloud', 'error');
+    gotoCloudPane();
+    return;
+  }
+  applyTranscriptionMode(CLOUD_MODE);
+  showToast('Cloud transcription on');
+}
+
+/** Wire the Local/Cloud cards: click + keyboard (Enter/Space). */
+function initTranscriptionMode() {
+  const handler = (fn) => (e) => {
+    if (e.type === 'keydown') {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+    }
+    void fn();
+  };
+  const localCard = document.getElementById('mode-card-local');
+  const cloudCard = document.getElementById('mode-card-cloud');
+  localCard?.addEventListener('click', handler(selectLocal));
+  localCard?.addEventListener('keydown', handler(selectLocal));
+  cloudCard?.addEventListener('click', handler(selectCloud));
+  cloudCard?.addEventListener('keydown', handler(selectCloud));
+  void refreshTranscriptionMode();
 }
 
 // --- Whisper models: list + download + cancel + set-active -----------------
@@ -261,6 +334,9 @@ function onDownloadProgress(p) {
 
 /** Wire the Capture pane: hotkey, mode control, model list + download events. */
 export function initCapture() {
+  // Transcription-mode selector (Local / Cloud cards).
+  initTranscriptionMode();
+
   // Record-shortcut control (replaces the raw accelerator text field). Mode-aware:
   // push-to-talk accepts a bare-modifier combo (hold ⌘⇧ to talk); toggle requires
   // a modifier + a base key. setHotkey returns {ok,error}; undefined → success.

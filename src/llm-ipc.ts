@@ -4,7 +4,7 @@
 import type { IpcMain } from 'electron';
 import type { KvStore } from './kv-store';
 import type { SecretStore } from './secret-store';
-import { getRemoteSttConfig, setRemoteSttConfig, getTransformConfig, setTransformConfig } from './cloud-config';
+import { getRemoteSttConfig, setRemoteSttConfig, getTransformConfig, setTransformConfig } from './cloud-config.ts';
 
 const OPENROUTER_KEY_ID = 'provider.openrouter.apiKey';
 
@@ -48,7 +48,9 @@ export function registerLlmIpc(
       enabled: !!c.enabled,
       baseUrl: String(c.baseUrl ?? ''),
       model: String(c.model ?? ''),
-      apiKey: String(c.apiKey ?? ''),
+      // Preserve the stored key when the caller omits apiKey (the Capture-pane
+      // Cloud toggle does); an explicit string (incl. '') still applies verbatim.
+      apiKey: typeof c.apiKey === 'string' ? c.apiKey : undefined,
     });
   });
 

@@ -28,7 +28,7 @@ export async function safeCall(name, ...args) {
 import { showToast } from './toast.js';
 import { initSidebar } from './sidebar.js';
 import { initOverview, applyOverviewStatus, renderOverviewStats } from './overview.js';
-import { initCapture, applyCaptureStatus } from './capture.js';
+import { initCapture, applyCaptureStatus, refreshTranscriptionMode } from './capture.js';
 import { initDictionary, loadDictionary } from './dictionary.js';
 import { initUsage, loadStats } from './usage.js';
 import { initTest, updateRecordBtn } from './test.js';
@@ -49,6 +49,7 @@ function onPaneActivate(panel) {
   // Overview + Usage re-fetch on each activation (UX-9); Dictionary loads once
   // (lazy) so unsaved edits aren't discarded when re-selecting the pane.
   if (panel === 'overview') renderOverviewStats();
+  if (panel === 'capture') void refreshTranscriptionMode();
   if (panel === 'dictionary') loadDictionary();
   if (panel === 'usage') loadStats();
   if (panel === 'cloud') loadCloud();

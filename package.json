@@ -1,7 +1,7 @@
 {
   "name": "@sigmalink/sigma-voice",
   "productName": "SigmaVoice",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "private": true,
   "description": "SigmaVoice — standalone system-wide dictation app powered by @sigmalink/voice-core. Hotkey → capture → whisper transcribe → clipboard/AX-paste into any focused app.",
   "author": "SigmaLink Team",

@@ -18,9 +18,10 @@ const TF_PROMPT = 'voice.transform.prompt';
 const PROMPT_CAP = 2000;
 const VALID_PRESETS = new Set(['punctuate', 'fillers', 'email', 'custom']);
 const DEFAULT_TF_MODEL = 'google/gemini-2.5-flash-lite';
+const DEFAULT_STT_MODEL = 'whisper-large-v3';
 
 export interface RemoteSttConfig { enabled: boolean; baseUrl: string; model: string; }
-export interface RemoteSttInput { enabled: boolean; baseUrl: string; model: string; apiKey: string; }
+export interface RemoteSttInput { enabled: boolean; baseUrl?: string; model?: string; apiKey?: string; }
 export interface TransformConfig { mode: 'off' | 'openrouter'; model: string; preset: string; prompt: string; }
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
@@ -32,19 +33,21 @@ export function getRemoteSttConfig(kv: KvStore): RemoteSttConfig {
   return {
     enabled: kv.get(STT_MODE) === 'openai-whisper-api',
     baseUrl: kv.get(STT_BASE) ?? '',
-    model: kv.get(STT_MODEL) ?? '',
+    model: kv.get(STT_MODEL) ?? DEFAULT_STT_MODEL,
   };
 }
 
 export function setRemoteSttConfig(kv: KvStore, input: RemoteSttInput): SaveResult {
   const baseUrl = (input.baseUrl ?? '').trim();
   const model = (input.model ?? '').trim();
-  const apiKey = (input.apiKey ?? '').trim();
   if (input.enabled) {
     if (!isHttpUrl(baseUrl)) return { ok: false, error: 'Enter a valid http(s):// endpoint URL.' };
     kv.set(STT_BASE, baseUrl);
     kv.set(STT_MODEL, model);
-    kv.set(STT_KEY, apiKey); // may be '' for keyless LAN servers
+    // apiKey omitted (undefined) → preserve the stored key; an explicit '' clears
+    // it (keyless LAN). The Capture-pane Cloud toggle omits it so flipping the
+    // mode never wipes a key the renderer can't see.
+    if (input.apiKey !== undefined) kv.set(STT_KEY, input.apiKey.trim());
     kv.set(STT_MODE, 'openai-whisper-api');
   } else {
     kv.set(STT_MODE, 'local');

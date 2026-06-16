@@ -160,7 +160,7 @@
 
         <p class="section-header">Transcription mode</p>
         <div class="mode-cards" role="group" aria-label="Transcription engine">
-          <div class="mode-card selected" aria-current="true">
+          <div class="mode-card selected" id="mode-card-local" role="button" tabindex="0" aria-pressed="true">
             <div class="mode-card-head">
               <span class="mode-card-title">Local</span>
               <span class="mode-card-check" aria-hidden="true">✓</span>
@@ -172,13 +172,16 @@
               <span class="chip">English</span>
             </div>
           </div>
-          <div class="mode-card disabled" aria-disabled="true">
+          <div class="mode-card" id="mode-card-cloud" role="button" tabindex="0" aria-pressed="false">
             <div class="mode-card-head">
               <span class="mode-card-title">Cloud</span>
+              <span class="mode-card-check" aria-hidden="true">✓</span>
             </div>
-            <p class="mode-card-desc">Hosted transcription for larger models.</p>
+            <p class="mode-card-desc">Send audio to your remote Whisper server.</p>
             <div class="chip-row">
-              <span class="chip chip-muted">Coming soon</span>
+              <span class="chip">Remote</span>
+              <span class="chip">Larger models</span>
+              <span class="chip">Online</span>
             </div>
           </div>
         </div>
@@ -359,7 +362,7 @@
             </div>
             <div class="row row-top">
               <div><div class="row-label">Model</div><div class="row-sublabel">Server-side id, e.g. Systran/faster-whisper-large-v3</div></div>
-              <input type="text" id="stt-model" class="text-input" placeholder="whisper-1" spellcheck="false" />
+              <input type="text" id="stt-model" class="text-input" placeholder="whisper-large-v3" spellcheck="false" />
             </div>
             <div class="row row-top">
               <div><div class="row-label">API key (optional)</div><div class="row-sublabel">Leave blank for a keyless LAN server.</div></div>
