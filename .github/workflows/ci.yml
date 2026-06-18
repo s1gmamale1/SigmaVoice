@@ -44,7 +44,7 @@ jobs:
           node-version: '24.x'
 
       - name: Install engine (link deps from ./sigmalink; skip native postinstall)
-        run: pnpm install --no-frozen-lockfile --ignore-scripts
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Typecheck
         run: pnpm typecheck

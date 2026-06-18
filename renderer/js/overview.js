@@ -5,7 +5,7 @@
 // and a 'Recent activity' list. Stats come from bv.getStats(); status comes
 // from applyStatus() (driven by getStatus + live onStateChange). getStatus only
 // exposes modelId — we resolve a friendly name from bv.listModels() (cached),
-// falling back to the id, then to 'macOS Speech'.
+// falling back to the id, then to the platform speech fallback.
 
 import { hasMethod, safeCall } from './settings.js';
 import { acceleratorTokens } from './keycaps.js';
@@ -25,14 +25,19 @@ async function ensureModelNames() {
   }
 }
 
+export function speechFallbackLabel(platform = globalThis.window?.bridgeVoice?.platform) {
+  return platform === 'darwin' ? 'macOS Speech' : 'System speech';
+}
+
 function setModelLabel(modelId) {
   const el = document.getElementById('overview-model');
   if (!el) return;
   const info = modelId && modelInfo ? modelInfo.get(modelId) : null;
   // The engine only uses a Whisper model once its file is downloaded; until then
-  // it falls back to macOS Speech — don't imply a Whisper model is active.
-  if (info && !info.downloaded) { el.textContent = 'macOS Speech'; return; }
-  el.textContent = (info && info.name) || modelId || 'macOS Speech';
+  // it falls back to system speech — don't imply a Whisper model is active.
+  const fallback = speechFallbackLabel();
+  if (info && !info.downloaded) { el.textContent = fallback; return; }
+  el.textContent = (info && info.name) || modelId || fallback;
 }
 
 /** Render the hotkey as keycap <kbd> glyphs into the given container. */

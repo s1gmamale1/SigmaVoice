@@ -1,15 +1,13 @@
 // SigmaVoice — remote-STT + transform config read/validate/persist (ADR-007).
 //
-// Pure logic over the KV store (no Electron). The OpenRouter API key is NOT here —
-// it lives in the encrypted secret-store (src/secret-store.ts). The STT key is a
-// per-server token kept in KV alongside the URL (matches the existing voice.stt.* keys).
+// Pure logic over the KV store (no Electron). API keys are NOT here — they live
+// in the encrypted secret-store (src/secret-store.ts).
 
 import type { KvStore } from './kv-store';
 
 const STT_MODE = 'voice.transcriptionMode';
 const STT_BASE = 'voice.stt.openai-whisper-api.baseUrl';
 const STT_MODEL = 'voice.stt.openai-whisper-api.model';
-const STT_KEY = 'voice.stt.openai-whisper-api.apiKey';
 const TF_MODE = 'voice.transform.mode';
 const TF_MODEL = 'voice.transform.model';
 const TF_PRESET = 'voice.transform.preset';
@@ -21,7 +19,7 @@ const DEFAULT_TF_MODEL = 'google/gemini-2.5-flash-lite';
 const DEFAULT_STT_MODEL = 'whisper-large-v3';
 
 export interface RemoteSttConfig { enabled: boolean; baseUrl: string; model: string; }
-export interface RemoteSttInput { enabled: boolean; baseUrl?: string; model?: string; apiKey?: string; }
+export interface RemoteSttInput { enabled: boolean; baseUrl?: string; model?: string; }
 export interface TransformConfig { mode: 'off' | 'openrouter'; model: string; preset: string; prompt: string; }
 export type SaveResult = { ok: true } | { ok: false; error: string };
 
@@ -44,10 +42,6 @@ export function setRemoteSttConfig(kv: KvStore, input: RemoteSttInput): SaveResu
     if (!isHttpUrl(baseUrl)) return { ok: false, error: 'Enter a valid http(s):// endpoint URL.' };
     kv.set(STT_BASE, baseUrl);
     kv.set(STT_MODEL, model);
-    // apiKey omitted (undefined) → preserve the stored key; an explicit '' clears
-    // it (keyless LAN). The Capture-pane Cloud toggle omits it so flipping the
-    // mode never wipes a key the renderer can't see.
-    if (input.apiKey !== undefined) kv.set(STT_KEY, input.apiKey.trim());
     kv.set(STT_MODE, 'openai-whisper-api');
   } else {
     kv.set(STT_MODE, 'local');

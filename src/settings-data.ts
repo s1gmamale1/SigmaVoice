@@ -56,7 +56,7 @@ export function getDictionary(kv: KvStore): DictionaryEntry[] {
     if (!raw) return [];
     const parsed: unknown = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isDictionaryEntry);
+    return sanitizeDictionaryEntries(parsed);
   } catch {
     return [];
   }
@@ -69,19 +69,7 @@ export function getDictionary(kv: KvStore): DictionaryEntry[] {
  * control characters (newline/tab preserved). Returns the list that was written.
  */
 export function setDictionary(kv: KvStore, entries: unknown): DictionaryEntry[] {
-  const clean = Array.isArray(entries) ? entries.filter(isDictionaryEntry) : [];
-  const sanitized = clean
-    // Pattern bounds (unchanged): non-empty, capped length.
-    .filter((e) => e.pattern.length > 0 && e.pattern.length <= MAX_PATTERN_LENGTH)
-    // Replacement bound: drop rows whose replacement exceeds the cap. Matches the
-    // existing over-long-pattern drop behavior (drop, don't truncate).
-    .filter((e) => e.replacement.length <= MAX_REPLACEMENT_LENGTH)
-    .map((e) => ({
-      pattern: e.pattern,
-      // Strip control chars from the replacement (keep \n and \t).
-      replacement: stripControlChars(e.replacement),
-      type: e.type,
-    }));
+  const sanitized = sanitizeDictionaryEntries(entries);
   kv.set(KV_DICTIONARY, JSON.stringify(sanitized));
   return sanitized;
 }
@@ -101,11 +89,9 @@ export function getStatsSummary(kv: KvStore): StatsSummary {
     const recent: StatsRecord[] = [];
 
     for (const row of parsed) {
-      if (!row || typeof row !== 'object') continue;
-      const r = row as Record<string, unknown>;
-      const words = typeof r.words === 'number' ? r.words : 0;
-      const wpm = typeof r.wpm === 'number' ? r.wpm : 0;
-      const timestamp = typeof r.timestamp === 'number' ? r.timestamp : 0;
+      const record = toStatsRecord(row);
+      if (!record) continue;
+      const { timestamp, words, wpm } = record;
       totalWords += words;
       if (wpm > 0) {
         wpmSum += wpm;
@@ -116,7 +102,7 @@ export function getStatsSummary(kv: KvStore): StatsSummary {
 
     return {
       totalWords,
-      recordings: parsed.length,
+      recordings: recent.length,
       avgWpm: wpmCount > 0 ? Math.round(wpmSum / wpmCount) : 0,
       recent: recent.slice(-RECENT_LIMIT).reverse(),
     };
@@ -133,4 +119,37 @@ function isDictionaryEntry(value: unknown): value is DictionaryEntry {
     typeof v.replacement === 'string' &&
     (v.type === 'phrase' || v.type === 'macro')
   );
+}
+
+function sanitizeDictionaryEntries(entries: unknown): DictionaryEntry[] {
+  const clean = Array.isArray(entries) ? entries.filter(isDictionaryEntry) : [];
+  return clean
+    // Pattern bounds (unchanged): non-empty, capped length.
+    .filter((e) => e.pattern.length > 0 && e.pattern.length <= MAX_PATTERN_LENGTH)
+    // Replacement bound: drop rows whose replacement exceeds the cap. Matches the
+    // existing over-long-pattern drop behavior (drop, don't truncate).
+    .filter((e) => e.replacement.length <= MAX_REPLACEMENT_LENGTH)
+    .map((e) => ({
+      pattern: e.pattern,
+      // Strip control chars from the replacement (keep \n and \t).
+      replacement: stripControlChars(e.replacement),
+      type: e.type,
+    }));
+}
+
+function isFiniteNonNegativeNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
+}
+
+function toStatsRecord(value: unknown): StatsRecord | null {
+  if (!value || typeof value !== 'object') return null;
+  const row = value as Record<string, unknown>;
+  if (
+    !isFiniteNonNegativeNumber(row.timestamp) ||
+    !isFiniteNonNegativeNumber(row.words) ||
+    !isFiniteNonNegativeNumber(row.wpm)
+  ) {
+    return null;
+  }
+  return { timestamp: row.timestamp, words: row.words, wpm: row.wpm };
 }

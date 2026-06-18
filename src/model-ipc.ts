@@ -14,6 +14,8 @@ import {
   abortDownload,
   type DownloadProgress,
 } from '@sigmalink/voice-core';
+import { shouldStartModelDownload } from './model-download-gate';
+import { toModelListItem } from './model-list-status';
 
 export function registerModelIpc(
   ipcMain: IpcMain,
@@ -28,15 +30,14 @@ export function registerModelIpc(
   ipcMain.handle('bv:listModels', () => {
     const modelsDir = deps.getModelsDir();
     const activeId = deps.getActiveModelId();
-    return MODEL_CATALOG.map((m) => ({
-      id: m.id,
-      name: m.name,
-      sizeMb: m.sizeMb,
-      isDefault: m.isDefault,
-      downloaded: isModelDownloaded(m, modelsDir),
-      downloading: isDownloading(m.id),
-      active: m.id === activeId,
-    }));
+    return MODEL_CATALOG.map((m) =>
+      toModelListItem(
+        m,
+        activeId,
+        isModelDownloaded(m, modelsDir),
+        isDownloading(m.id),
+      ),
+    );
   });
 
   // Download a model; streams progress over 'voice:model-download', resolves when
@@ -44,6 +45,8 @@ export function registerModelIpc(
   ipcMain.handle('bv:downloadModel', async (_e, id: string) => {
     const entry = MODEL_CATALOG.find((m) => m.id === id);
     if (!entry) return { ok: false, error: `Unknown model: ${id}` };
+    const gate = shouldStartModelDownload(id, isDownloading(id));
+    if (!gate.ok) return gate;
     // The renderer understands an optional `aborted` terminal flag — a user cancel
     // is a clean stop, not a failure — so the local emit widens the payload type.
     const emit = (p: DownloadProgress & { aborted?: boolean }): void =>

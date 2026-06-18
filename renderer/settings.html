@@ -165,7 +165,7 @@
               <span class="mode-card-title">Local</span>
               <span class="mode-card-check" aria-hidden="true">✓</span>
             </div>
-            <p class="mode-card-desc">On-device Whisper. No audio leaves your Mac.</p>
+            <p class="mode-card-desc">On-device Whisper. No audio leaves this device.</p>
             <div class="chip-row">
               <span class="chip">Private</span>
               <span class="chip">Offline</span>
@@ -191,7 +191,7 @@
           <div class="row row-top">
             <div>
               <div class="row-label">Whisper model</div>
-              <div class="row-sublabel">Runs fully local — download one to transcribe. Until then, macOS Speech is used.</div>
+              <div class="row-sublabel">Runs fully local — download one to transcribe. Until then, system speech is used.</div>
             </div>
             <button id="model-refresh-btn" class="btn btn-ghost" aria-label="Refresh model list">Refresh</button>
           </div>
@@ -368,7 +368,7 @@
               <div><div class="row-label">API key (optional)</div><div class="row-sublabel">Leave blank for a keyless LAN server.</div></div>
               <input type="password" id="stt-key" class="text-input" placeholder="optional" autocomplete="off" />
             </div>
-            <p class="row-sublabel cloud-warn">&#x26A0;&#xFE0F; Audio leaves this Mac to the address you set.</p>
+            <p class="row-sublabel cloud-warn">&#x26A0;&#xFE0F; Audio leaves this device to the address you set.</p>
             <div class="row flex-end"><button id="stt-save-btn" class="btn btn-primary">Save</button></div>
           </div>
         </div>
@@ -412,7 +412,7 @@
               <div><div class="row-label">Custom prompt</div></div>
               <textarea id="tf-prompt" class="text-input" rows="3" placeholder="Describe how to transform the text&#x2026;"></textarea>
             </div>
-            <p class="row-sublabel cloud-warn">&#x26A0;&#xFE0F; Transcript text leaves this Mac to OpenRouter.</p>
+            <p class="row-sublabel cloud-warn">&#x26A0;&#xFE0F; Transcript text leaves this device to OpenRouter.</p>
             <div class="row flex-end"><button id="tf-save-btn" class="btn btn-primary">Save</button></div>
           </div>
         </div>

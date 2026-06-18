@@ -370,6 +370,9 @@ body {
 .record-btn.idle { background: var(--red); color: #fff; box-shadow: 0 2px 12px rgba(255, 69, 58, 0.35); }
 .record-btn.idle:hover { background: #e83a31; }
 .record-btn.recording { background: rgba(255, 69, 58, 0.18); color: var(--red); border: 1.5px solid rgba(255, 69, 58, 0.4); box-shadow: none; }
+.record-btn.busy,
+.record-btn:disabled { opacity: 0.45; cursor: not-allowed; box-shadow: none; }
+.record-btn:disabled:active { transform: none; }
 .record-icon { width: 10px; height: 10px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 .record-btn.recording .record-icon { border-radius: 2px; }
 

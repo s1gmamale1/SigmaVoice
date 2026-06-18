@@ -8,14 +8,69 @@
 import { acceleratorTokens } from './keycaps.js';
 
 /** Held modifiers as Electron tokens, in a stable canonical order. */
-function modsFromEvent(e) {
+export function getRendererPlatform() {
+  return globalThis.window?.bridgeVoice?.platform ?? 'darwin';
+}
+
+/** Held modifiers as Electron tokens, in a stable canonical order. */
+export function modsFromEvent(e, platform = getRendererPlatform()) {
   const mods = [];
-  if (e.metaKey) mods.push('CommandOrControl'); // Command on macOS
-  if (e.ctrlKey) mods.push('Control');
+  if (platform === 'darwin') {
+    if (e.metaKey) mods.push('CommandOrControl'); // Command on macOS
+    if (e.ctrlKey) mods.push('Control');
+  } else {
+    if (e.ctrlKey) mods.push('CommandOrControl');
+    if (e.metaKey) mods.push('Super');
+  }
   if (e.altKey) mods.push('Alt');
   if (e.shiftKey) mods.push('Shift');
   return mods;
 }
+
+export function captureHint(mode, platform = getRendererPlatform()) {
+  const isWin = platform === 'win32';
+  if (mode === 'push-to-talk') {
+    return isWin
+      ? 'Hold a modifier combo (Ctrl+Shift) or modifier+key, then release. Esc cancels.'
+      : 'Hold a modifier combo (⌘⇧) or modifier+key, then release. Esc cancels.';
+  }
+  return isWin
+    ? 'Press a modifier plus a key (e.g. Ctrl+Alt+Space). Esc cancels.'
+    : 'Press a modifier plus a key (e.g. ⌘⌥Space). Esc cancels.';
+}
+
+function modeHint(mode = null) {
+  const currentMode = mode ?? getModeSafe();
+  const isWin = getRendererPlatform() === 'win32';
+  if (currentMode === 'push-to-talk') {
+    return isWin
+      ? 'Hold the keys you want to push-to-talk with (e.g. Ctrl+Shift), then release.'
+      : 'Hold the keys you want to push-to-talk with (e.g. ⌘⇧), then release.';
+  }
+  return isWin
+    ? 'Press a shortcut — a modifier plus a key (e.g. Ctrl+Alt+Space).'
+    : 'Press a shortcut — a modifier plus a key (e.g. ⌘⌥Space).';
+}
+
+function addModifierHint() {
+  return getRendererPlatform() === 'win32'
+    ? 'Add a modifier (Ctrl/Alt/Shift/Win) — a bare key would hijack it globally.'
+    : 'Add a modifier (⌘/⌥/⌃/⇧) — a bare key would hijack it globally.';
+}
+
+function bareModifierHint(mode) {
+  const isWin = getRendererPlatform() === 'win32';
+  if (mode === 'push-to-talk') {
+    return isWin
+      ? 'Hold at least two modifiers (e.g. Ctrl+Shift), or add a key.'
+      : 'Hold at least two modifiers (e.g. ⌘⇧), or add a key.';
+  }
+  return isWin
+    ? 'Toggle needs a key — press a modifier plus a key (e.g. Ctrl+Alt+Space).'
+    : 'Toggle needs a key — press a modifier plus a key (e.g. ⌘⌥Space).';
+}
+
+let getModeSafe = () => 'toggle';
 
 const NAMED_CODE = {
   Space: 'Space', Enter: 'Return', NumpadEnter: 'Return', Tab: 'Tab',
@@ -44,6 +99,7 @@ function baseKeyFromEvent(e) {
  *   binding from live status (a no-op while the user is actively capturing).
  */
 export function initHotkeyCapture({ getMode, onCommit }) {
+  getModeSafe = getMode;
   const btn = document.getElementById('hotkey-capture-btn');
   const capsEl = document.getElementById('hotkey-keycaps');
   const hintEl = document.getElementById('hotkey-hint');
@@ -71,11 +127,6 @@ export function initHotkeyCapture({ getMode, onCommit }) {
     }
   }
 
-  function modeHint() {
-    return getMode() === 'push-to-talk'
-      ? 'Hold the keys you want to push-to-talk with (e.g. ⌘⇧), then release.'
-      : 'Press a shortcut — a modifier plus a key (e.g. ⌘⌥Space).';
-  }
   function setHint(text) { if (hintEl) hintEl.textContent = text; }
 
   function setValue(accel) {
@@ -110,7 +161,7 @@ export function initHotkeyCapture({ getMode, onCommit }) {
 
     if (base) {
       if (mods.length === 0) {
-        setHint('Add a modifier (⌘/⌥/⌃/⇧) — a bare key would hijack it globally.');
+        setHint(addModifierHint());
         renderCaps(base, 'Press your keys…');
         return;
       }
@@ -135,9 +186,7 @@ export function initHotkeyCapture({ getMode, onCommit }) {
       return;
     }
     setHint(
-      getMode() === 'push-to-talk'
-        ? 'Hold at least two modifiers (e.g. ⌘⇧), or add a key.'
-        : 'Toggle needs a key — press a modifier plus a key (e.g. ⌘⌥Space).',
+      bareModifierHint(getMode()),
     );
     renderCaps(currentValue, 'Press your keys…');
   }
@@ -149,11 +198,7 @@ export function initHotkeyCapture({ getMode, onCommit }) {
     btn.classList.add('capturing');
     btn.setAttribute('aria-pressed', 'true');
     renderCaps('', 'Press your keys…');
-    setHint(
-      getMode() === 'push-to-talk'
-        ? 'Hold a modifier combo (⌘⇧) or modifier+key, then release. Esc cancels.'
-        : 'Press a modifier plus a key (e.g. ⌘⌥Space). Esc cancels.',
-    );
+    setHint(captureHint(getMode()));
     document.addEventListener('keydown', onKeyDown, true);
     document.addEventListener('keyup', onKeyUp, true);
     window.addEventListener('blur', onBlur);

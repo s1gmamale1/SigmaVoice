@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setDictionary, getStatsSummary } from './settings-data.ts';
+import { getDictionary, setDictionary, getStatsSummary } from './settings-data.ts';
 import type { KvStore } from './kv-store.ts';
 
 /** Minimal in-memory KvStore over a Map (string→string). */
@@ -62,6 +62,23 @@ test('setDictionary strips control chars from replacement but keeps \\n and \\t'
   assert.deepEqual(JSON.parse(kv.get('voice.dictionary')!), result);
 });
 
+test('getDictionary sanitizes persisted rows with the same caps as writes', () => {
+  const kv = fakeKv({
+    'voice.dictionary': JSON.stringify([
+      { pattern: 'gh', replacement: 'GitHub\x07', type: 'phrase' },
+      { pattern: '', replacement: 'empty pattern', type: 'phrase' },
+      { pattern: 'p'.repeat(201), replacement: 'too long pattern', type: 'phrase' },
+      { pattern: 'big', replacement: 'z'.repeat(2001), type: 'macro' },
+      { pattern: 'ok', replacement: 'line1\nline2\ttabbed', type: 'macro' },
+    ]),
+  });
+
+  assert.deepEqual(getDictionary(kv), [
+    { pattern: 'gh', replacement: 'GitHub', type: 'phrase' },
+    { pattern: 'ok', replacement: 'line1\nline2\ttabbed', type: 'macro' },
+  ]);
+});
+
 test('getStatsSummary returns zeros on empty/missing key', () => {
   assert.deepEqual(getStatsSummary(fakeKv()), {
     totalWords: 0, recordings: 0, avgWpm: 0, recent: [],
@@ -87,4 +104,26 @@ test('getStatsSummary aggregates totalWords/recordings and rounds avgWpm', () =>
   assert.equal(s.totalWords, 42); // 10+5+20+7
   assert.equal(s.recordings, 4); // all rows counted, incl. the wpm:0 row
   assert.equal(s.avgWpm, 88); // Math.round((100+81+82)/3) = Math.round(87.67) = 88
+});
+
+test('getStatsSummary ignores invalid persisted stat rows', () => {
+  const kv = fakeKv({
+    'voice.stats': JSON.stringify([
+      { timestamp: 1, words: 10, wpm: 100 },
+      { timestamp: Number.NaN, words: 1, wpm: 1 },
+      { timestamp: 2, words: -5, wpm: 120 },
+      { timestamp: 3, words: 5, wpm: Number.POSITIVE_INFINITY },
+      { timestamp: 4, words: 7, wpm: 0 },
+      { timestamp: 5, words: '9', wpm: 50 },
+    ]),
+  });
+
+  const s = getStatsSummary(kv);
+  assert.equal(s.totalWords, 17);
+  assert.equal(s.recordings, 2);
+  assert.equal(s.avgWpm, 100);
+  assert.deepEqual(s.recent, [
+    { timestamp: 4, words: 7, wpm: 0 },
+    { timestamp: 1, words: 10, wpm: 100 },
+  ]);
 });

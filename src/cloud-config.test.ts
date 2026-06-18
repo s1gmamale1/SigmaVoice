@@ -10,19 +10,19 @@ function fakeKv(seed?: Record<string, string>): KvStore {
   return { get: (k) => (map.has(k) ? map.get(k)! : null), set: (k, v) => { map.set(k, v); } };
 }
 
-test('setRemoteSttConfig enabled writes mode + trimmed url/model/key', () => {
+test('setRemoteSttConfig enabled writes mode + trimmed url/model only', () => {
   const kv = fakeKv();
-  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: '  http://192.168.1.5:8000/v1 ', model: ' large-v3 ', apiKey: ' k ' });
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: '  http://192.168.1.5:8000/v1 ', model: ' large-v3 ' });
   assert.equal(r.ok, true);
   assert.equal(kv.get('voice.transcriptionMode'), 'openai-whisper-api');
   assert.equal(kv.get('voice.stt.openai-whisper-api.baseUrl'), 'http://192.168.1.5:8000/v1');
   assert.equal(kv.get('voice.stt.openai-whisper-api.model'), 'large-v3');
-  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), 'k');
+  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), null);
 });
 
 test('setRemoteSttConfig rejects an enabled config with a bad url', () => {
   const kv = fakeKv();
-  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'not-a-url', model: '', apiKey: '' });
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'not-a-url', model: '' });
   assert.equal(r.ok, false);
   assert.match(r.error, /url/i);
   assert.equal(kv.get('voice.transcriptionMode'), null);
@@ -32,16 +32,16 @@ test('setRemoteSttConfig rejects an enabled url with no host (non-http scheme)',
   // WHATWG-hostless http(s) urls (e.g. "http://") throw and are caught; "file:///x"
   // parses with an empty hostname, so the hostname-non-empty guard rejects it.
   const kv = fakeKv();
-  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'file:///etc/passwd', model: '', apiKey: '' });
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'file:///etc/passwd', model: '' });
   assert.equal(r.ok, false);
   assert.equal(kv.get('voice.transcriptionMode'), null);
 });
 
-test('setRemoteSttConfig enabled with empty apiKey persists empty string (keyless LAN)', () => {
+test('setRemoteSttConfig enabled with empty apiKey leaves key storage untouched', () => {
   const kv = fakeKv();
-  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'http://192.168.1.5:9000', model: '', apiKey: '' });
+  const r = setRemoteSttConfig(kv, { enabled: true, baseUrl: 'http://192.168.1.5:9000', model: '' });
   assert.equal(r.ok, true);
-  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), '');
+  assert.equal(kv.get('voice.stt.openai-whisper-api.apiKey'), null);
 });
 
 test('setRemoteSttConfig preserves the stored key when apiKey is omitted', () => {
@@ -61,7 +61,7 @@ test('setRemoteSttConfig switches to local with only {enabled:false}', () => {
 
 test('setRemoteSttConfig disabled reverts mode to local (keeps url for next time)', () => {
   const kv = fakeKv({ 'voice.transcriptionMode': 'openai-whisper-api', 'voice.stt.openai-whisper-api.baseUrl': 'http://x/v1' });
-  const r = setRemoteSttConfig(kv, { enabled: false, baseUrl: 'http://x/v1', model: '', apiKey: '' });
+  const r = setRemoteSttConfig(kv, { enabled: false, baseUrl: 'http://x/v1', model: '' });
   assert.equal(r.ok, true);
   assert.equal(kv.get('voice.transcriptionMode'), 'local');
   assert.equal(kv.get('voice.stt.openai-whisper-api.baseUrl'), 'http://x/v1');

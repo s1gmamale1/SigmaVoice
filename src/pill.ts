@@ -25,17 +25,24 @@ export function getPillAppearance(kv: KvStore | null): 'full' | 'compact' {
   return kv?.get(KV_PILL_APPEARANCE) === 'compact' ? 'compact' : 'full';
 }
 
+export function isFinitePoint(point: unknown): point is { x: number; y: number } {
+  return (
+    point != null &&
+    typeof (point as { x?: unknown }).x === 'number' &&
+    typeof (point as { y?: unknown }).y === 'number' &&
+    Number.isFinite((point as { x: number }).x) &&
+    Number.isFinite((point as { y: number }).y)
+  );
+}
+
 /** Saved pill top-left, or null for the default bottom-center. */
 export function getSavedPillPosition(kv: KvStore | null): { x: number; y: number } | null {
   const raw = kv?.get(KV_PILL_POS);
   if (!raw) return null;
   try {
     const p: unknown = JSON.parse(raw);
-    if (
-      p && typeof (p as { x?: unknown }).x === 'number' &&
-      typeof (p as { y?: unknown }).y === 'number'
-    ) {
-      return { x: (p as { x: number }).x, y: (p as { y: number }).y };
+    if (isFinitePoint(p)) {
+      return { x: p.x, y: p.y };
     }
   } catch { /* corrupt → default */ }
   return null;
@@ -87,8 +94,8 @@ export function registerPillIpc(
     else if (st.state === 'idle' && st.enabled) void ctrl.startRecording();
     // transcribing → ignore (don't start a new capture mid-transcribe)
   });
-  ipcMain.on('hud:move', (_e, pos: { x?: unknown; y?: unknown }) => {
-    if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') deps.hud()?.moveTo(pos.x, pos.y);
+  ipcMain.on('hud:move', (_e, pos: unknown) => {
+    if (isFinitePoint(pos)) deps.hud()?.moveTo(pos.x, pos.y);
   });
   ipcMain.on('hud:move-end', () => {
     // Persist the ACTUAL (clamped) window position — moveTo keeps the pill on

@@ -5,6 +5,7 @@ import type { IpcMain } from 'electron';
 import type { KvStore } from './kv-store';
 import type { SecretStore } from './secret-store';
 import { getRemoteSttConfig, setRemoteSttConfig, getTransformConfig, setTransformConfig } from './cloud-config.ts';
+import { REMOTE_STT_KEY_ID } from './secret-backed-kv.ts';
 
 const OPENROUTER_KEY_ID = 'provider.openrouter.apiKey';
 
@@ -44,14 +45,26 @@ export function registerLlmIpc(
     const kv = deps.kv();
     if (!kv) return { ok: false, error: 'No store' };
     const c = (cfg ?? {}) as Record<string, unknown>;
-    return setRemoteSttConfig(kv, {
+    if (typeof c.apiKey === 'string' && !deps.secrets()) {
+      return { ok: false, error: 'Secret store unavailable' };
+    }
+    const result = setRemoteSttConfig(kv, {
       enabled: !!c.enabled,
       baseUrl: String(c.baseUrl ?? ''),
       model: String(c.model ?? ''),
-      // Preserve the stored key when the caller omits apiKey (the Capture-pane
-      // Cloud toggle does); an explicit string (incl. '') still applies verbatim.
-      apiKey: typeof c.apiKey === 'string' ? c.apiKey : undefined,
     });
+    if (result.ok && typeof c.apiKey === 'string') {
+      const secrets = deps.secrets();
+      if (!secrets) return { ok: false, error: 'Secret store unavailable' };
+      const key = c.apiKey.trim();
+      try {
+        if (key) secrets.setSecret(REMOTE_STT_KEY_ID, key);
+        else secrets.clearSecret(REMOTE_STT_KEY_ID);
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : 'Failed to store STT key' };
+      }
+    }
+    return result;
   });
 
   // ── Transform (cleanup) config ──

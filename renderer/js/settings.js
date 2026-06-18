@@ -10,7 +10,7 @@
 // Every call is guarded: a missing window.bridgeVoice or missing method
 // degrades to a no-op / placeholder value rather than throwing.
 
-export const bv = window.bridgeVoice ?? null;
+export const bv = globalThis.window?.bridgeVoice ?? null;
 
 export function hasMethod(name) {
   return bv !== null && typeof bv[name] === 'function';
@@ -40,7 +40,7 @@ function applyStatus(status) {
   if (!status) return;
   applyOverviewStatus(status);
   applyCaptureStatus(status);
-  updateRecordBtn(status.state ?? 'idle');
+  updateRecordBtn(status);
 }
 
 // --- Pane activation (lazy data load) --------------------------------------
@@ -89,8 +89,10 @@ function boot() {
   }
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', boot, { once: true });
-} else {
-  boot();
+if (globalThis.document) {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot, { once: true });
+  } else {
+    boot();
+  }
 }

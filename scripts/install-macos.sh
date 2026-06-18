@@ -77,11 +77,17 @@ if [[ -z "$TAG" ]]; then
   echo "✗ Could not determine a release tag." >&2
   exit 3
 fi
+if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "✗ Refusing release tag '$TAG'; expected vX.Y.Z." >&2
+  exit 3
+fi
 
 # Strip a leading "v" to derive the version used in artefact filenames.
 VERSION="${TAG#v}"
 DMG_FILENAME="${APP_NAME}-${VERSION}-arm64.dmg"
 DMG_URL="https://github.com/$REPO/releases/download/$TAG/$DMG_FILENAME"
+SUMS_FILENAME="SHA256SUMS-macos.txt"
+SUMS_URL="https://github.com/$REPO/releases/download/$TAG/$SUMS_FILENAME"
 
 echo "→ Target release: $TAG"
 echo "→ DMG: $DMG_URL"
@@ -104,6 +110,27 @@ if [[ ! -s "$DMG_PATH" ]]; then
   exit 4
 fi
 echo "→ Download complete ($(du -h "$DMG_PATH" | cut -f1))."
+
+SUMS_PATH="$WORK_DIR/$SUMS_FILENAME"
+echo "→ Downloading checksum manifest..."
+if ! curl -fsSL "$SUMS_URL" -o "$SUMS_PATH"; then
+  echo "✗ Checksum manifest download failed: $SUMS_URL" >&2
+  exit 4
+fi
+
+EXPECTED_SHA="$(awk -v file="$DMG_FILENAME" '$2 == file { print $1 }' "$SUMS_PATH" | head -1)"
+if [[ -z "$EXPECTED_SHA" ]]; then
+  echo "✗ Checksum manifest does not contain $DMG_FILENAME." >&2
+  exit 4
+fi
+ACTUAL_SHA="$(shasum -a 256 "$DMG_PATH" | awk '{ print $1 }')"
+if [[ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]]; then
+  echo "✗ DMG checksum mismatch." >&2
+  echo "  expected: $EXPECTED_SHA" >&2
+  echo "  actual:   $ACTUAL_SHA" >&2
+  exit 4
+fi
+echo "→ Checksum verified."
 
 # Belt-and-braces: strip quarantine even though curl shouldn't set it.
 xattr -d com.apple.quarantine "$DMG_PATH" 2>/dev/null || true

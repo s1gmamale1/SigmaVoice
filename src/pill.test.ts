@@ -2,7 +2,7 @@
 // settings helpers import cleanly under `node --test`.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isPillEnabled, getPillAppearance, getSavedPillPosition } from './pill.ts';
+import { isFinitePoint, isPillEnabled, getPillAppearance, getSavedPillPosition } from './pill.ts';
 
 /** Minimal KvStore stand-in over a plain map. */
 function kvOf(map: Record<string, string>) {
@@ -30,4 +30,12 @@ test('getSavedPillPosition parses {x,y}; falls back on corrupt / wrong-shape / m
   assert.equal(getSavedPillPosition(kvOf({ 'voice.pill.pos': 'not json' })), null);
   assert.equal(getSavedPillPosition(kvOf({ 'voice.pill.pos': '{"x":"a","y":2}' })), null);
   assert.equal(getSavedPillPosition(kvOf({})), null);
+});
+
+test('isFinitePoint rejects non-finite coordinates', () => {
+  assert.equal(isFinitePoint({ x: 10, y: 20 }), true);
+  assert.equal(isFinitePoint({ x: Number.NaN, y: 20 }), false);
+  assert.equal(isFinitePoint({ x: 10, y: Number.POSITIVE_INFINITY }), false);
+  assert.equal(isFinitePoint({ x: '10', y: 20 }), false);
+  assert.equal(isFinitePoint(null), false);
 });

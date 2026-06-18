@@ -42,6 +42,9 @@ import { isPillEnabled, pillHudDeps, registerPillIpc } from './pill';
 import { registerModelIpc } from './model-ipc';
 import { createSecretStore, type SecretStore, type SafeStorageLike } from './secret-store';
 import { registerLlmIpc } from './llm-ipc';
+import { canStartManualCapture } from './capture-gate';
+import { platformWindowChrome } from './settings-window-options';
+import { createSecretBackedKv } from './secret-backed-kv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -224,14 +227,10 @@ function openSettingsWindow(): void {
     minHeight: 520,
     title: 'SigmaVoice Settings',
     show: false,
-    // macOS sidebar app chrome: inset traffic lights over a draggable sidebar
-    // header, real window vibrancy behind a transparent body, no opaque backing
-    // so the vibrancy material shows through. On win/linux these are ignored or
-    // degrade to a plain window — the CSS provides solid surfaces there.
-    titleBarStyle: 'hiddenInset',
-    vibrancy: 'sidebar',
-    transparent: true,
-    backgroundColor: '#00000000',
+    // macOS gets inset traffic lights + real vibrancy. Windows keeps a normal
+    // opaque window path; transparent windows there have different hit-test and
+    // composition behavior.
+    ...platformWindowChrome(process.platform),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -313,7 +312,10 @@ function registerIpc(): void {
   });
 
   // Manual trigger (for settings UI test button)
-  ipcMain.handle('bv:startRecording', () => captureCtrl?.startRecording());
+  ipcMain.handle('bv:startRecording', () => {
+    if (!captureCtrl || !canStartManualCapture(captureCtrl.getStatus())) return undefined;
+    return captureCtrl.startRecording();
+  });
   ipcMain.handle('bv:stopAndTranscribe', () => captureCtrl?.stopAndTranscribe());
 
   // Dictionary + verbal macros (persisted in KV 'voice.dictionary'; consumed by
@@ -435,7 +437,7 @@ app.whenReady().then(() => {
           syncHud(payload);
         }
       },
-      kv: store,
+      kv: createSecretBackedKv(store, secrets),
       getModelsDir,
       clipboard: {
         writeText: (text: string) => clipboard.writeText(text),
