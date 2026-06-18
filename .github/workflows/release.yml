@@ -133,7 +133,9 @@ jobs:
   # ---------------------------------------------------------------------------
   build-windows:
     name: build windows installer
-    runs-on: windows-latest
+    # Pin native packaging to VS 2022. windows-latest can expose newer Visual
+    # Studio images before node-gyp recognizes their version metadata.
+    runs-on: windows-2022
     timeout-minutes: 40
     steps:
       - name: Checkout (with SigmaLink submodule, recursive for whisper.cpp)

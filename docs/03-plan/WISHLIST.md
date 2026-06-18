@@ -18,7 +18,7 @@
 
 ## Release-readiness audit + app-shell fix pass (2026-06-18)
 
-**Scope.** Audited current release readiness after PRs #1-#4 merged through `v0.5.2`; app-shell fixes are prepared for `v0.5.3`, with emphasis on macOS arm64, Windows x64, IPC edge cases, persisted data hygiene, and release gating. Engine/native issues remain tracked against the SigmaLink submodule; this repo owns only app-shell fixes.
+**Scope.** Audited current release readiness after PRs #1-#4 merged through `v0.5.2`; app-shell fixes are prepared for `v0.5.4`, with emphasis on macOS arm64, Windows x64, IPC edge cases, persisted data hygiene, and release gating. Engine/native issues remain tracked against the SigmaLink submodule; this repo owns only app-shell fixes.
 
 ### Fixed in `fix/release-readiness-app-shell`
 - ✅ **CA-9** Duplicate model downloads now reject while the same model is already in flight (`src/model-ipc.ts`, `src/model-download-gate.ts`). `impact M / effort S`
@@ -29,7 +29,7 @@
 - ✅ **WIN-5** Hotkey capture now maps Windows Ctrl to `CommandOrControl` and Win to `Super`, with Windows-specific hints (`renderer/js/hotkey-capture.js`). `impact M / effort S`
 - ✅ **WIN-9** Remote-STT API keys now go through `SecretStore` rather than plaintext KV, including the capture-runtime KV adapter (`src/secret-backed-kv.ts`, `src/llm-ipc.ts`, `src/main.ts`). `impact M / effort S`
 - ✅ **WIN-13a** Settings-window macOS vibrancy/transparent chrome is now gated to darwin; Windows uses opaque default chrome (`src/settings-window-options.ts`). `impact S / effort S`
-- ✅ **SEC-3 / SEC-7 / WIN-15** Root lockfile is tracked, root CI/release installs use `--frozen-lockfile`, release gates run `typecheck` + `test`, local `pack:*` is CI-only, release tags must match `package.json`, macOS installer verifies SHA-256, and Windows release setup pins MSBuild/Python (`.github/workflows/*`, `scripts/install-macos.sh`, `scripts/ci-only-pack.cjs`). `impact M / effort M`
+- ✅ **SEC-3 / SEC-7 / WIN-15** Root lockfile is tracked, root CI/release installs use `--frozen-lockfile`, release gates run `typecheck` + `test`, local `pack:*` is CI-only, release tags must match `package.json`, macOS installer verifies SHA-256, and Windows release setup pins the VS 2022 runner plus MSBuild/Python (`.github/workflows/*`, `scripts/install-macos.sh`, `scripts/ci-only-pack.cjs`). `impact M / effort M`
 
 ### Still blocks or constrains release readiness
 - 🔧 **Windows native parity is not release-ready yet.** Existing W-SV1 plus the Windows loader/native packaging issue need SigmaLink fixes and a Windows x64 packaged smoke before advertising parity.
@@ -248,7 +248,7 @@ Gate-green (`pnpm typecheck`+`pnpm test` 20/20+`pnpm build`), spec+quality revie
 ### Infra
 - ✅ **WIN-14** [shipped v0.5.1] `ci.yml` is now a `[macos-14, windows-latest]` matrix (early Windows signal);
   also fixed the `pnpm test` glob (single→double quotes) so it isn't a vacuous no-op under cmd.exe on Windows. `medium/S` ⭐
-- ✅ **WIN-15** `release.yml` build-windows now installs MSBuild + Python explicitly before native rebuilds. `medium/S` (latent, gated W-SV1)
+- ✅ **WIN-15** `release.yml` build-windows now uses `windows-2022` plus explicit MSBuild + Python setup before native rebuilds. `medium/S` (latent, gated W-SV1)
 
 ### Follow-ups (from the v0.5.1 PR #2 review — non-blocking)
 - **WIN-16** Unify platform detection: `renderer/js/capture.js` derives `isWin` from `window.bridgeVoice.platform`
