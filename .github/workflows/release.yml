@@ -132,10 +132,13 @@ jobs:
   # Windows — unsigned NSIS installer (x64)
   # ---------------------------------------------------------------------------
   build-windows:
-    name: build windows installer
+    name: build windows installer (advisory until W-SV1)
     # Pin native packaging to VS 2022. windows-latest can expose newer Visual
     # Studio images before node-gyp recognizes their version metadata.
     runs-on: windows-2022
+    # The Windows voice-whisper native is still owned by the SigmaLink W-SV1
+    # track. Keep running the job for signal, but do not block macOS releases.
+    continue-on-error: true
     timeout-minutes: 40
     steps:
       - name: Checkout (with SigmaLink submodule, recursive for whisper.cpp)

@@ -18,7 +18,7 @@
 
 ## Release-readiness audit + app-shell fix pass (2026-06-18)
 
-**Scope.** Audited current release readiness after PRs #1-#4 merged through `v0.5.2`; app-shell fixes are prepared for `v0.5.4`, with emphasis on macOS arm64, Windows x64, IPC edge cases, persisted data hygiene, and release gating. Engine/native issues remain tracked against the SigmaLink submodule; this repo owns only app-shell fixes.
+**Scope.** Audited current release readiness after PRs #1-#4 merged through `v0.5.2`; app-shell fixes are prepared for `v0.5.5`, with emphasis on macOS arm64, Windows x64, IPC edge cases, persisted data hygiene, and release gating. Engine/native issues remain tracked against the SigmaLink submodule; this repo owns only app-shell fixes.
 
 ### Fixed in `fix/release-readiness-app-shell`
 - ✅ **CA-9** Duplicate model downloads now reject while the same model is already in flight (`src/model-ipc.ts`, `src/model-download-gate.ts`). `impact M / effort S`
@@ -34,7 +34,7 @@
 ### Still blocks or constrains release readiness
 - 🔧 **Windows native parity is not release-ready yet.** Existing W-SV1 plus the Windows loader/native packaging issue need SigmaLink fixes and a Windows x64 packaged smoke before advertising parity.
 - 🔧 **macOS quit-time native crash risk remains engine-owned.** W-SV2 is still in SigmaLink; app-shell teardown remains guarded but cannot fix the ThreadSafeFunction release race.
-- **Installed-build hardware smoke is still required.** macOS Apple Silicon and Windows x64 need installed-build smoke on real mic, hotkey, model download/cancel, tray, HUD/pill drag, quit/relaunch, remote-STT secret, and OpenRouter-secret paths. Packaging itself remains CI-only.
+- **Installed-build hardware smoke is still required.** macOS Apple Silicon needs installed-build smoke on real mic, hotkey, model download/cancel, tray, HUD/pill drag, quit/relaunch, remote-STT secret, and OpenRouter-secret paths. Windows packaging remains advisory until the SigmaLink W-SV1 voice-whisper native linker failure is fixed. Packaging itself remains CI-only.
 
 ---
 
