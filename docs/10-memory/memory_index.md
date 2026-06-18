@@ -15,5 +15,6 @@ open bugs in [`../08-bugs/OPEN.md`](../08-bugs/OPEN.md); next-phase sequence in
 | SV-07 | macOS `curl\|bash` installer (`scripts/install-macos.sh`, quarantine-free) | shipped | mirrors SigmaLink's installer |
 | SV-08 | Repo doc ecosystem + handoff (this docs/ tree) for the incoming maintainer | shipped | CLAUDE.md + docs/ + HANDOFF |
 | SV-09 | v0.4.0 — Phase 0 (functional/honest UX) + Phase 1 (Apple-grade UI) + Phase 1.5 (modifier hold-to-talk PTT + floating pill) | shipped (pre-release) | macOS arm64 DMG; reviewed by 2 sub-agents; on-device smoke pending → stable |
+| SV-10 | v0.5.5 — release-readiness app-shell hardening + macOS release | shipped (pre-release) | macOS DMG/ZIP + checksum published; Windows job advisory until SigmaLink W-SV1 |
 | W-SV1 | Windows NSIS build — `voice-whisper` MSVC link (`LNK1120`) | 🔴 open | engine fix in SigmaLink; Windows-runner CI |
 | W-SV2 | Quit-time TSFN SIGABRT | 🟠 open (low) | `tsfn_bridge` fix in SigmaLink |

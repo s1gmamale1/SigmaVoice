@@ -8,8 +8,9 @@ is the narrative + decisions that aren't obvious from git.
 
 A standalone, local-first, **system-wide voice→text dictation** app for macOS (Apple Silicon):
 global hotkey → on-device Whisper → paste into any focused app. Tray-only, unsigned/internal-use,
-free + private. Inspired by BridgeMind's BridgeVoice; the differentiator is local-by-default (no
-cloud, no account, no paywall). Windows x64 is a target but currently blocked (W-SV1).
+free + private. Inspired by BridgeMind's BridgeVoice; the differentiator is local-by-default
+(optional BYO remote STT/OpenRouter cleanup is explicit opt-in; no account, no paywall).
+Windows x64 is a target but currently blocked on the SigmaLink `voice-whisper` native (W-SV1).
 
 ## Topology
 
@@ -41,6 +42,26 @@ SigmaLink (the "voice-core dead tree") shipped inert features to prod — single
 - **macOS target is arm64-only** (per the SigmaLink macOS-arm64 ADR) — also avoids an x64 whisper.cpp
   cross-compile in CI.
 - **Unsigned posture** stands (mac ad-hoc + afterSign codesign; win no Authenticode). Signing needs an ADR.
+
+## 2026-06-18 — v0.5.5: release-readiness app-shell hardening
+- **Trigger.** User asked for a full multi-agent release-readiness/debug pass across merged PRs and platform
+  risk before release. Scope was corrected to **SigmaVoice app-shell only**; SigmaLink engine/native bugs remain
+  upstream.
+- **Shipped to `main`** (commits `d95293b`, `55f9f1e`, `efd05a3`; tag **v0.5.5**): duplicate model-download
+  guard; model list/Overview no longer claim a selected-but-undownloaded model is active; manual Test recording
+  now respects enabled+idle capture state; pill move IPC rejects non-finite coordinates; persisted dictionary
+  and stats reads re-apply sanitization. Windows app-shell polish included Ctrl/Win hotkey capture mapping,
+  generic system-speech fallback copy, and darwin-only settings-window vibrancy/transparent chrome.
+- **Security/release hardening.** Remote-STT API keys now route through `SecretStore` via a secret-backed KV
+  adapter; `pnpm-lock.yaml` is tracked; root CI/release installs use `--frozen-lockfile`; release tags must
+  match `package.json`; release jobs run app-shell `typecheck` + `test`; local `pack:*` is guarded as CI-only;
+  macOS releases publish `SHA256SUMS-macos.txt`, and `scripts/install-macos.sh` verifies the DMG hash before
+  mounting.
+- **Release result.** GitHub release **v0.5.5** published as a pre-release with macOS arm64 DMG/ZIP and checksum
+  assets. The macOS release job passed native build, app-shell typecheck/test/build, packaging, checksum, upload,
+  and release attachment. Windows packaging is intentionally **advisory until W-SV1**: `voice-win` built on
+  `windows-2022`, but SigmaLink `voice-whisper` still fails with unresolved `ggml_*` linker symbols, so no
+  Windows installer was published.
 
 ## 2026-06-15 — v0.5.1: Windows-parity app-shell quick-wins
 - **Trigger.** "Optimize under Windows" → a 5-agent read-only audit (Phase-1 of `/systematic-debugging`) of the
